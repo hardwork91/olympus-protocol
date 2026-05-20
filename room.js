@@ -58,45 +58,45 @@ export async function joinRoom(roomId) {
   const snap = await get(ref(db, `games/${roomId}`));
 
   if (!snap.exists()) {
-    throw new Error('Sala no encontrada. Verifica el código.');
+    throw new Error('Room not found. Check the code.');
   }
 
   const room = snap.val();
 
-  // Reconnect como seat 2
+  // Reconnect as seat 2
   if (room.seats && room.seats[2] === user.uid) {
     return { roomId, user, room };
   }
 
-  // Caso "te intentas unir a tu propia sala": ya eres seat 1
+  // Case "you're trying to join your own room": you are already seat 1
   if (room.seats && room.seats[1] === user.uid) {
     if (room.seats[2]) {
-      // seat 2 ya ocupado por otro: reconnect normal como seat 1
+      // seat 2 already occupied by another: normal reconnect as seat 1
       return { roomId, user, room };
     } else {
-      // seat 2 vacío y tú eres seat 1: intentando unirte a tu propia sala
+      // seat 2 empty and you are seat 1: trying to join your own room
       throw new Error(
-        'Ya eres el Jugador 1 de esta sala. Para añadir un Jugador 2, ' +
-        'abre la URL en una ventana de incógnito (Ctrl+Shift+N) o en otro navegador.'
+        'You are already Player 1 in this room. To add a Player 2, ' +
+        'open the URL in an incognito window (Ctrl+Shift+N) or another browser.'
       );
     }
   }
 
-  // No estás sentado: intentar reclamar seat 2
+  // You are not seated: try to claim seat 2
   if (room.seats && room.seats[2]) {
-    throw new Error('Sala llena. Ya hay 2 jugadores en esta partida.');
+    throw new Error('Room full. There are already 2 players in this game.');
   }
 
   const seatsRef = ref(db, `games/${roomId}/seats/2`);
   const result = await runTransaction(seatsRef, (current) => {
     if (current) {
-      return; // abort si alguien lo tomó entre nuestro get() y la transacción
+      return; // abort if someone took it between our get() and the transaction
     }
     return user.uid;
   });
 
   if (!result.committed) {
-    throw new Error('Sala llena (otro jugador entró antes que tú).');
+    throw new Error('Room full (another player joined before you).');
   }
 
   const updated = await get(ref(db, `games/${roomId}`));

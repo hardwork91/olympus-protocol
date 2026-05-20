@@ -311,10 +311,12 @@ body {
 }
 
 .frame-name {
-  left: 12.84%;
+  left: 11%;
+  right: 11%;
   top: 3.1%;
   font-size: 9.5cqi;
   letter-spacing: 0.04em;
+  text-align: center;
 }
 
 .frame-fp {

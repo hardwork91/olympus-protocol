@@ -90,7 +90,7 @@ export class Game {
     p.deck = shuffle(p.deck);
     // Robar 5 nuevas
     this.drawTo(playerId, 5);
-    this.log(`Jugador ${playerId} declara mulligan. Mano nueva: ${p.hand.length} cartas.`);
+    this.log(`Player ${playerId} declares mulligan. New hand: ${p.hand.length} cards.`);
     return true;
   }
 
@@ -98,8 +98,8 @@ export class Game {
     if (this.phase !== 'setup') return false;
     if (this.setupState.currentPlayer !== playerId) return false;
     if (this.setupState.step !== 'mulligan_or_confirm') return false;
-    this.setupState.step = 'placing_units';
-    this.log(`Jugador ${playerId} confirma mano y pasa a colocar unidades.`);
+    this.setupState.step = 'placing';
+    this.log(`Player ${playerId} confirms hand and proceeds to place units and skill.`);
     return true;
   }
 
@@ -111,11 +111,14 @@ export class Game {
 
     if (this.phase === 'setup') {
       if (this.setupState.currentPlayer !== playerId) return [];
-      if (this.setupState.step === 'placing_units' && card.type === 'unit') {
-        if (!this.players[playerId].frontLine) slots.push('frontLine');
-        if (!this.players[playerId].rearGuard) slots.push('rearGuard');
-      } else if (this.setupState.step === 'placing_skill' && card.type === 'skill') {
-        if (!this.players[playerId].skill) slots.push('skill');
+      if (this.setupState.step === 'placing') {
+        if (card.type === 'unit') {
+          if (!this.players[playerId].frontLine) slots.push('frontLine');
+          if (!this.players[playerId].rearGuard) slots.push('rearGuard');
+        }
+        if (card.type === 'skill') {
+          if (!this.players[playerId].skill) slots.push('skill');
+        }
       }
       return slots;
     }
@@ -160,13 +163,13 @@ export class Game {
       const oldSkill = p.skill;
       p.skill = { card, state: 'hidden' };
       this.sendToBottom(playerId, oldSkill.card);
-      this.log(`Jugador ${playerId} reemplaza su skill. Antigua (#${oldSkill.card.id} ${oldSkill.card.name}) va al fondo del mazo.`);
+      this.log(`Player ${playerId} replaces their skill. Old (#${oldSkill.card.id} ${oldSkill.card.name}) goes to bottom of deck.`);
       this.turnState.isReplacingSkill = false;
       this.turnState.skillReplacedThisTurn = true;
     }
 
     if (slot !== 'skill_replace') {
-      this.log(`Jugador ${playerId} coloca #${card.id} ${card.name} en ${slot}.`);
+      this.log(`Player ${playerId} places #${card.id} ${card.name} in ${slot}.`);
     }
     return true;
   }
@@ -175,31 +178,23 @@ export class Game {
   finishSetup(playerId) {
     if (this.phase !== 'setup') return false;
     if (this.setupState.currentPlayer !== playerId) return false;
-    if (this.setupState.step !== 'placing_units' && this.setupState.step !== 'placing_skill') return false;
+    if (this.setupState.step !== 'placing') return false;
 
-    this.log(`Jugador ${playerId} termina su setup.`);
+    this.log(`Player ${playerId} finishes setup.`);
     if (playerId === 1) {
       this.setupState.currentPlayer = 2;
       this.setupState.step = 'mulligan_or_confirm';
     } else {
-      // Ambos jugadores listos → coin flip
+      // Both players ready → coin flip + reveal
       this.coinFlip();
     }
     return true;
   }
 
-  // El jugador pasa de colocar unidades a colocar skill (opcional).
-  proceedToSkillPlacement(playerId) {
-    if (this.phase !== 'setup') return false;
-    if (this.setupState.currentPlayer !== playerId) return false;
-    if (this.setupState.step !== 'placing_units') return false;
-    this.setupState.step = 'placing_skill';
-    return true;
-  }
-
   coinFlip() {
     this.activePlayer = this.config.forceP1Start ? 1 : (Math.random() < 0.5 ? 1 : 2);
-    this.log(`🪙 Moneda virtual: el Jugador ${this.activePlayer} ataca primero.`);
+    this.log(`🪙 Coin flip: Player ${this.activePlayer} attacks first.`);
+    this.log(`🎴 Setup combat cards revealed.`);
     this.phase = 'playing';
     this.startTurn(this.activePlayer);
   }
@@ -226,14 +221,14 @@ export class Game {
 
     if (active.skill && active.skill.state === 'hidden' && active.skill.card.subtype === 'Offensive') {
       active.skill.state = 'active';
-      this.log(`⚡ Jugador ${playerId} voltea Offensive: #${active.skill.card.id} ${active.skill.card.name}`);
+      this.log(`⚡ Player ${playerId} flips Offensive: #${active.skill.card.id} ${active.skill.card.name}`);
     }
     if (rival.skill && rival.skill.state === 'hidden' && rival.skill.card.subtype === 'Defensive') {
       rival.skill.state = 'active';
-      this.log(`🛡 Jugador rival voltea Defensive: #${rival.skill.card.id} ${rival.skill.card.name}`);
+      this.log(`🛡 Rival player flips Defensive: #${rival.skill.card.id} ${rival.skill.card.name}`);
     }
 
-    this.log(`▶ Turno ${this.turnNumber}, jugador activo: ${playerId}`);
+    this.log(`▶ Turn ${this.turnNumber}, active player: ${playerId}`);
   }
 
   canReplaceSkill(playerId) {
@@ -265,7 +260,7 @@ export class Game {
     if (this.turnState.drawnThisTurn) return;
     this.drawTo(playerId, 5);
     this.turnState.drawnThisTurn = true;
-    this.log(`Jugador ${playerId} roba hasta 5 cartas (mano: ${this.players[playerId].hand.length}).`);
+    this.log(`Player ${playerId} draws up to 5 cards (hand: ${this.players[playerId].hand.length}).`);
   }
 
   // Paso 3: reponer slots vacíos es obligatorio si hay unidades.
@@ -391,9 +386,9 @@ export class Game {
     };
     this.gameOver = { winner, reason, stats };
     let msg = '';
-    if (reason === 'life') msg = `🏆 Jugador ${winner} gana por reducción de vida a 0.`;
-    else if (reason === 'turnLimit') msg = `🏆 Jugador ${winner} gana por límite de turnos (más vida restante).`;
-    else if (reason === 'draw') msg = `🤝 Empate técnico por límite de turnos con vidas iguales.`;
+    if (reason === 'life') msg = `🏆 Player ${winner} wins by life reduction to 0.`;
+    else if (reason === 'turnLimit') msg = `🏆 Player ${winner} wins by turn limit (more life remaining).`;
+    else if (reason === 'draw') msg = `🤝 Technical draw by turn limit with equal life.`;
     this.log(msg);
   }
 

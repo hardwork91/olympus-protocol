@@ -1,89 +1,92 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Olympus Protocol — Simulador</title>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Olympus Protocol — Simulator</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- Modal menú principal: Crear o Unirse -->
+  <!-- Main menu modal: Create or Join -->
   <div id="main-menu-modal" class="modal hidden">
     <div class="modal-content">
       <h2>OLYMPUS PROTOCOL</h2>
-      <p style="text-align:center;color:var(--text-dim);margin-bottom:24px;">Simulador 1v1 online · Fase 0</p>
-      <button id="btn-create" class="modal-btn-primary">Crear partida nueva</button>
-      <button id="btn-join" class="modal-btn-secondary">Unirme con código</button>
+      <p style="text-align:center;color:var(--text-dim);margin-bottom:24px;">1v1 Online Simulator · Phase 0</p>
+      <button id="btn-create" class="modal-btn-primary">Create new game</button>
+      <button id="btn-join" class="modal-btn-secondary">Join with code</button>
     </div>
   </div>
 
-  <!-- Modal crear partida -->
+  <!-- Create game modal -->
   <div id="create-modal" class="modal hidden">
     <div class="modal-content">
-      <h2>Crear partida</h2>
+      <h2>Create game</h2>
       <label>
-        Vida inicial (10-50):
+        Starting life (10-50):
         <input id="config-vida" type="number" min="10" max="50" value="20" />
       </label>
       <label>
-        Turnos máximos (10-40):
+        Max turns (10-40):
         <input id="config-turnos" type="number" min="10" max="40" value="20" />
       </label>
-      <button id="btn-create-confirm" class="modal-btn-primary">Crear partida</button>
-      <button id="btn-create-cancel" class="modal-btn-secondary">Cancelar</button>
+      <button id="btn-create-confirm" class="modal-btn-primary">Create game</button>
+      <button id="btn-create-cancel" class="modal-btn-secondary">Cancel</button>
     </div>
   </div>
 
-  <!-- Modal unirse a partida -->
+  <!-- Join game modal -->
   <div id="join-modal" class="modal hidden">
     <div class="modal-content">
-      <h2>Unirse a partida</h2>
+      <h2>Join game</h2>
       <label>
-        Código de sala (6 caracteres):
+        Room code (6 characters):
         <input id="join-code" type="text" maxlength="6" autocomplete="off" placeholder="ABC123" style="text-transform: uppercase; letter-spacing: 0.1em;" />
       </label>
       <div id="join-error" class="error-msg hidden"></div>
-      <button id="btn-join-confirm" class="modal-btn-primary">Unirme</button>
-      <button id="btn-join-cancel" class="modal-btn-secondary">Cancelar</button>
+      <button id="btn-join-confirm" class="modal-btn-primary">Join</button>
+      <button id="btn-join-cancel" class="modal-btn-secondary">Cancel</button>
     </div>
   </div>
 
-  <!-- Modal de espera (P1 esperando a P2) -->
+  <!-- Waiting modal (P1 waiting for P2) -->
   <div id="waiting-modal" class="modal hidden">
     <div class="modal-content">
-      <h2>Esperando jugador 2...</h2>
-      <p style="text-align:center;color:var(--text-dim);">Comparte este código:</p>
+      <h2>Waiting for player 2...</h2>
+      <p style="text-align:center;color:var(--text-dim);">Share this code:</p>
       <div class="code-display" id="waiting-code">XXXXXX</div>
-      <button id="btn-copy-url" class="modal-btn-primary">Copiar URL</button>
+      <button id="btn-copy-url" class="modal-btn-primary">Copy URL</button>
       <p style="text-align:center;color:var(--text-dim);font-size:11px;margin-top:16px;">
-        El rival debe abrir esta URL o introducir el código en "Unirme con código".<br>
-        <strong>Para testing en el mismo navegador:</strong> abre la URL en una ventana de incógnito (Ctrl+Shift+N).
+        Your opponent must open this URL or enter the code in "Join with code".<br>
+        <strong>For testing in the same browser:</strong> open the URL in an incognito window (Ctrl+Shift+N).
       </p>
     </div>
   </div>
 
-  <!-- Modal de fin de partida -->
+  <!-- Game over modal -->
   <div id="endgame-modal" class="modal hidden">
     <div class="modal-content">
-      <h2 id="endgame-title">Fin de partida</h2>
+      <h2 id="endgame-title">Game over</h2>
       <div id="endgame-stats"></div>
-      <button id="endgame-new" class="modal-btn-primary">Nueva partida</button>
+      <button id="endgame-new" class="modal-btn-primary">New game</button>
     </div>
   </div>
 
-  <!-- App: 2 columnas (board + sidebar) -->
+  <!-- App: 2 columns (board + sidebar) -->
   <div class="app">
-    <!-- Main area: board (player 2 arriba, player 1 abajo) -->
+    <!-- Main area: board (player 2 on top, player 1 on bottom) -->
     <main class="main-area">
-      <!-- Jugador 2 (arriba) -->
+      <!-- Player 2 (top) -->
       <section class="player p2" id="player-2">
         <div class="slots-grid">
           <div class="slot" data-player="2" data-slot="rearGuard"></div>
           <div class="player-info" id="p2-display">
-            <div class="player-name">Jugador 2</div>
-            <div class="player-stat"><span class="stat-label">Tu vida</span><span class="stat-value player-life">❤ <span id="p2-life">20</span></span></div>
-            <div class="player-stat"><span class="stat-label">Enemigo</span><span class="stat-value enemy-life">❤ <span id="p2-enemy-life">20</span></span></div>
-            <div class="player-stat"><span class="stat-label">Turno</span><span class="stat-value" id="p2-display-turn">T1/20</span></div>
+            <div class="player-name">Player 2</div>
+            <div class="player-stat"><span class="stat-label">Your life</span><span class="stat-value player-life">❤ <span id="p2-life">20</span></span></div>
+            <div class="player-stat"><span class="stat-label">Enemy</span><span class="stat-value enemy-life">❤ <span id="p2-enemy-life">20</span></span></div>
+            <div class="player-stat"><span class="stat-label">Turn</span><span class="stat-value" id="p2-display-turn">T1/20</span></div>
             <div class="display-active" id="p2-display-active"></div>
             <div class="display-pending" id="p2-display-pending"></div>
           </div>
@@ -93,17 +96,17 @@
         <div class="hand" id="p2-hand"></div>
       </section>
 
-      <!-- Jugador 1 (abajo) -->
+      <!-- Player 1 (bottom) -->
       <section class="player p1" id="player-1">
         <div class="slots-grid">
           <div class="slot" data-player="1" data-slot="frontLine"></div>
           <div class="slot" data-player="1" data-slot="skill"></div>
           <div class="slot" data-player="1" data-slot="rearGuard"></div>
           <div class="player-info" id="p1-display">
-            <div class="player-name">Jugador 1</div>
-            <div class="player-stat"><span class="stat-label">Tu vida</span><span class="stat-value player-life">❤ <span id="p1-life">20</span></span></div>
-            <div class="player-stat"><span class="stat-label">Enemigo</span><span class="stat-value enemy-life">❤ <span id="p1-enemy-life">20</span></span></div>
-            <div class="player-stat"><span class="stat-label">Turno</span><span class="stat-value" id="p1-display-turn">T1/20</span></div>
+            <div class="player-name">Player 1</div>
+            <div class="player-stat"><span class="stat-label">Your life</span><span class="stat-value player-life">❤ <span id="p1-life">20</span></span></div>
+            <div class="player-stat"><span class="stat-label">Enemy</span><span class="stat-value enemy-life">❤ <span id="p1-enemy-life">20</span></span></div>
+            <div class="player-stat"><span class="stat-label">Turn</span><span class="stat-value" id="p1-display-turn">T1/20</span></div>
             <div class="display-active" id="p1-display-active"></div>
             <div class="display-pending" id="p1-display-pending"></div>
           </div>
@@ -116,9 +119,9 @@
     <aside class="sidebar">
       <header class="sidebar-header">
         <h1>OLYMPUS PROTOCOL</h1>
-        <div class="sidebar-subtitle">Simulador 1v1 online · <span id="sidebar-seat-label">—</span></div>
+        <div class="sidebar-subtitle">1v1 Online Simulator · <span id="sidebar-seat-label">—</span></div>
         <div class="sidebar-room-code" id="sidebar-room-code"></div>
-        <button id="menu-restart">Salir al menú</button>
+        <button id="menu-restart">Exit to menu</button>
       </header>
 
       <div class="combat-log" id="combat-log"></div>

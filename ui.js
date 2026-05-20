@@ -22,7 +22,7 @@ import {
 
 // Cache-busting: bump esta cadena cuando se actualicen imágenes para
 // forzar al navegador a redescargarlas en vez de servirlas de caché.
-const ASSET_VERSION = '21';
+const ASSET_VERSION = '23';
 
 // ──────────────────────────────────────────────────────────────────
 // Estado global del UI
@@ -103,7 +103,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     console.log('[firebase] uid =', userId);
   } catch (err) {
     console.error('[firebase] sign-in failed:', err);
-    alert('No se pudo conectar con Firebase. Revisa tu conexión y recarga.');
+    alert('Could not connect to Firebase. Check your connection and reload.');
     return;
   }
 
@@ -167,7 +167,7 @@ async function handleCreate() {
     subscribeToRoom();
   } catch (e) {
     console.error(e);
-    alert('Error creando sala: ' + e.message);
+    alert('Error creating room: ' + e.message);
   }
 }
 
@@ -176,14 +176,14 @@ async function handleJoin() {
   try {
     const code = $('join-code').value.toUpperCase().trim();
     if (!/^[A-Z2-9]{6}$/.test(code)) {
-      showJoinError('El código debe tener 6 caracteres (A-Z sin O/I, 2-9).');
+      showJoinError('Code must be 6 characters (A-Z without O/I, 2-9).');
       return;
     }
     const { roomId: joinedRoomId, room } = await joinRoom(code);
     roomId = joinedRoomId;
     localSeat = getMySeat(room, userId);
     if (!localSeat) {
-      showJoinError('No se pudo asignar asiento. Intenta de nuevo.');
+      showJoinError('Could not assign seat. Try again.');
       return;
     }
     setRoomInURL(joinedRoomId);
@@ -205,22 +205,22 @@ function handleCopyURL() {
   const url = buildRoomURL(roomId);
   navigator.clipboard.writeText(url).then(() => {
     const btn = $('btn-copy-url');
-    btn.textContent = '✓ Copiada';
-    setTimeout(() => { btn.textContent = 'Copiar URL'; }, 2000);
+    btn.textContent = '✓ Copied';
+    setTimeout(() => { btn.textContent = 'Copy URL'; }, 2000);
   }).catch(() => {
-    prompt('Copia esta URL manualmente:', url);
+    prompt('Copy this URL manually:', url);
   });
 }
 
 function handleRestart() {
-  if (!confirm('¿Salir de esta partida y volver al menú?')) return;
+  if (!confirm('Exit this game and return to menu?')) return;
   if (unsubRoom) unsubRoom();
   window.location.href = window.location.pathname;
 }
 
 function updateSidebarSeat() {
-  $('sidebar-seat-label').textContent = localSeat ? `Eres Jugador ${localSeat}` : '—';
-  $('sidebar-room-code').textContent = roomId ? `Sala: ${roomId}` : '';
+  $('sidebar-seat-label').textContent = localSeat ? `You are Player ${localSeat}` : '—';
+  $('sidebar-room-code').textContent = roomId ? `Room: ${roomId}` : '';
   // Si soy P2, el CSS [data-local-seat="2"] flipea el layout (P2 abajo, P1 arriba)
   const appEl = document.querySelector('.app');
   if (appEl && localSeat) {
@@ -307,13 +307,19 @@ function renderPlayer(playerId, g) {
 }
 
 function renderSlot(playerId, slotName, card) {
+  const g = visibleState();
   const slotEl = document.querySelector(`.slot[data-player="${playerId}"][data-slot="${slotName}"]`);
   slotEl.innerHTML = '';
   slotEl.classList.toggle('empty', !card);
   slotEl.classList.remove('highlight', 'highlight-replace');
 
   if (card) {
-    slotEl.appendChild(renderCardEl(card));
+    // Durante setup, las cartas en slots del rival se ven face-down (revelo al coin flip).
+    if (g && g.phase === 'setup' && localSeat !== playerId) {
+      slotEl.appendChild(renderCardBackEl());
+    } else {
+      slotEl.appendChild(renderCardEl(card));
+    }
   } else {
     slotEl.appendChild(el('div', 'slot-label', slotName === 'frontLine' ? 'FRONT LINE' : 'REAR GUARD'));
   }
@@ -494,29 +500,25 @@ function renderActionBar(g) {
 
 function renderSetupActions(bar, g) {
   const sid = g.setupState ? g.setupState.currentPlayer : null;
-  const status = el('div', 'action-status', `SETUP del Jugador ${sid} — paso: ${g.setupState ? g.setupState.step : '?'}`);
+  const status = el('div', 'action-status', `SETUP for Player ${sid} — step: ${g.setupState ? g.setupState.step : '?'}`);
   bar.appendChild(status);
 
   if (sid !== localSeat) {
-    bar.appendChild(el('div', 'action-warn', `Esperando al Jugador ${sid}...`));
+    bar.appendChild(el('div', 'action-warn', `Waiting for Player ${sid}...`));
     return;
   }
 
   if (g.setupState.step === 'mulligan_or_confirm') {
     if (game.canDeclareMulligan(sid)) {
-      const btn = el('button', 'btn btn-mulligan', 'Declarar Mulligan');
+      const btn = el('button', 'btn btn-mulligan', 'Declare Mulligan');
       btn.addEventListener('click', () => doAction(() => game.declareMulligan(sid)));
       bar.appendChild(btn);
     }
-    const confirmBtn = el('button', 'btn btn-confirm', 'Confirmar mano');
+    const confirmBtn = el('button', 'btn btn-confirm', 'Confirm hand');
     confirmBtn.addEventListener('click', () => doAction(() => game.confirmHand(sid)));
     bar.appendChild(confirmBtn);
-  } else if (g.setupState.step === 'placing_units') {
-    const nextBtn = el('button', 'btn btn-next', 'Continuar a colocar Skill (opcional)');
-    nextBtn.addEventListener('click', () => doAction(() => game.proceedToSkillPlacement(sid)));
-    bar.appendChild(nextBtn);
-  } else if (g.setupState.step === 'placing_skill') {
-    const finishBtn = el('button', 'btn btn-confirm', 'Finalizar setup');
+  } else if (g.setupState.step === 'placing') {
+    const finishBtn = el('button', 'btn btn-confirm', 'Finish setup');
     finishBtn.addEventListener('click', () => {
       clearSelection();
       doAction(() => game.finishSetup(sid));
@@ -527,38 +529,38 @@ function renderSetupActions(bar, g) {
 
 function renderPlayingActions(bar, g) {
   const pid = g.activePlayer;
-  const status = el('div', 'action-status', `Turno ${g.turnNumber}/${g.config.maxTurnos} — Jugador activo: ${pid}`);
+  const status = el('div', 'action-status', `Turn ${g.turnNumber}/${g.config.maxTurnos} — Active player: ${pid}`);
   bar.appendChild(status);
 
   if (pid !== localSeat) {
-    bar.appendChild(el('div', 'action-warn', `Esperando al Jugador ${pid}...`));
+    bar.appendChild(el('div', 'action-warn', `Waiting for Player ${pid}...`));
     return;
   }
 
   if (game.turnState && !game.turnState.drawnThisTurn) {
     if (game.canReplaceSkill(pid) && !game.turnState.isReplacingSkill) {
-      const btn = el('button', 'btn btn-replace', 'Reemplazar Skill');
+      const btn = el('button', 'btn btn-replace', 'Replace Skill');
       btn.addEventListener('click', () => doAction(() => game.enterReplaceSkillMode(pid)));
       bar.appendChild(btn);
     }
     if (game.turnState && game.turnState.isReplacingSkill) {
-      const btn = el('button', 'btn btn-cancel', 'Cancelar reemplazo');
+      const btn = el('button', 'btn btn-cancel', 'Cancel replacement');
       btn.addEventListener('click', () => {
         clearSelection();
         doAction(() => game.exitReplaceSkillMode(pid));
       });
       bar.appendChild(btn);
     }
-    const drawBtn = el('button', 'btn btn-draw', 'Robar (paso 2)');
+    const drawBtn = el('button', 'btn btn-draw', 'Draw (step 2)');
     drawBtn.addEventListener('click', () => doAction(() => game.drawPhase(pid)));
     bar.appendChild(drawBtn);
   }
 
   if (game.needsRefill(pid)) {
-    bar.appendChild(el('div', 'action-warn', '⚠ Debes reponer slots vacíos con unidades de tu mano.'));
+    bar.appendChild(el('div', 'action-warn', '⚠ You must fill empty slots with units from your hand.'));
   }
 
-  const endBtn = el('button', 'btn btn-end-turn', 'Fin de turno');
+  const endBtn = el('button', 'btn btn-end-turn', 'End turn');
   if (!game.canEndTurn(pid)) endBtn.disabled = true;
   endBtn.addEventListener('click', performEndTurn);
   bar.appendChild(endBtn);
@@ -682,14 +684,14 @@ function showEndGameModal() {
   if (!game || !game.gameOver) return;
   const { winner, reason, stats } = game.gameOver;
   let title;
-  if (reason === 'life') title = `🏆 Jugador ${winner} gana — vida reducida a 0`;
-  else if (reason === 'turnLimit') title = `🏆 Jugador ${winner} gana — más vida tras límite de turnos`;
-  else title = `🤝 Empate técnico`;
+  if (reason === 'life') title = `🏆 Player ${winner} wins — life reduced to 0`;
+  else if (reason === 'turnLimit') title = `🏆 Player ${winner} wins — more life after turn limit`;
+  else title = `🤝 Technical draw`;
 
   $('endgame-title').textContent = title;
   $('endgame-stats').innerHTML = `
-    <p>Vida final — Jugador 1: <strong>${stats.finalLife[1]}</strong> · Jugador 2: <strong>${stats.finalLife[2]}</strong></p>
-    <p>Turnos completos jugados: <strong>${Math.floor(stats.turnsPlayed)}</strong></p>
+    <p>Final life — Player 1: <strong>${stats.finalLife[1]}</strong> · Player 2: <strong>${stats.finalLife[2]}</strong></p>
+    <p>Total turns played: <strong>${Math.floor(stats.turnsPlayed)}</strong></p>
   `;
   showModal('endgame-modal');
 }

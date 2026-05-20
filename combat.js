@@ -42,7 +42,7 @@ export function resolveAttack(game, attackerId, defenderId) {
   const attacker = game.players[attackerId];
   const defender = game.players[defenderId];
 
-  log.push(`▶ Comienza el ataque del Jugador ${attackerId}`);
+  log.push(`▶ Player ${attackerId}'s attack begins`);
 
   // ───────────────────────────────────────────────────────────────────
   // Fase A: Determinar habilidades activas (Offensive del atacante, Defensive del defensor)
@@ -54,11 +54,11 @@ export function resolveAttack(game, attackerId, defenderId) {
     ? defender.skill.card : null;
 
   if (attackerSkill) {
-    log.push(`⚡ Atacante activa Offensive: #${attackerSkill.id} ${attackerSkill.name}`);
+    log.push(`⚡ Attacker activates Offensive: #${attackerSkill.id} ${attackerSkill.name}`);
     result.consumedSkills.push({ playerId: attackerId, skillId: attackerSkill.id });
   }
   if (defenderSkill) {
-    log.push(`🛡 Defensor activa Defensive: #${defenderSkill.id} ${defenderSkill.name}`);
+    log.push(`🛡 Defender activates Defensive: #${defenderSkill.id} ${defenderSkill.name}`);
     result.consumedSkills.push({ playerId: defenderId, skillId: defenderSkill.id });
   }
 
@@ -99,9 +99,9 @@ export function resolveAttack(game, attackerId, defenderId) {
   if (trapChargeIdx >= 0) {
     if (attacker.frontLine) {
       aMods.frontFirepowerBonus += 5;
-      log.push(`💥 Trap Charge pendiente del atacante: +5 Firepower a Front Line`);
+      log.push(`💥 Attacker's pending Trap Charge: +5 Firepower to Front Line`);
     } else {
-      log.push(`⚠ Trap Charge pendiente del atacante se pierde (Front Line vacía)`);
+      log.push(`⚠ Attacker's pending Trap Charge lost (Front Line empty)`);
     }
     result.consumedPendingEffects.push({ playerId: attackerId, type: 'trap_charge' });
   }
@@ -114,7 +114,7 @@ export function resolveAttack(game, attackerId, defenderId) {
   const attackPasses = aMods.doubleAttack ? 2 : 1;
 
   for (let pass = 1; pass <= attackPasses; pass++) {
-    if (attackPasses > 1) log.push(`━━ Pasada ${pass}/${attackPasses} (Double Shot) ━━`);
+    if (attackPasses > 1) log.push(`━━ Pass ${pass}/${attackPasses} (Double Shot) ━━`);
 
     // Estado actual del tablero ANTES de este pase (pero ya considerando destrucciones de pases anteriores)
     const aFront = result.destroyed.attackerFront ? null : attacker.frontLine;
@@ -127,65 +127,64 @@ export function resolveAttack(game, attackerId, defenderId) {
     let step1Ended = false;
 
     if (!aFront && !aRear) {
-      log.push(`⚠ Caso C: ambos slots atacantes vacíos → ataque nulo`);
+      log.push(`⚠ Case C: both attacker slots empty → null attack`);
       step1Ended = true;
     } else if (!aFront && aRear) {
-      // Caso A: Rear Guard asume el rol del Paso 1
-      log.push(`▸ Caso A: Front Line atacante vacía. Rear Guard asume rol del Paso 1.`);
-      const aRearFP = aRear.firepower; // Caso A: no aplican buffs de Front Line (interpretación literal)
+      // Case A: Rear Guard takes the role of Step 1
+      log.push(`▸ Case A: Attacker Front Line empty. Rear Guard takes Step 1 role.`);
+      const aRearFP = aRear.firepower; // Case A: no Front Line buffs apply (literal interpretation)
       const dFrontArmor = dFront ? (dFront.armor + dMods.frontArmorBonus) : 0;
-      log.push(`▸ Paso 1: Rear Guard atacante FP ${aRearFP} vs Front Line defensora Armor ${dFrontArmor}`);
+      log.push(`▸ Step 1: Attacker Rear Guard FP ${aRearFP} vs Defender Front Line Armor ${dFrontArmor}`);
       const diff1 = aRearFP - dFrontArmor;
       if (diff1 <= 0) {
-        log.push(`  diff1 = ${diff1} → ninguna carta destruida (Rear Guard no se expone). Fin del ataque.`);
+        log.push(`  diff1 = ${diff1} → no card destroyed (Rear Guard does not expose itself). End of attack.`);
         step1Ended = true;
       } else {
-        log.push(`  diff1 = ${diff1} → Front Line defensora destruida. Excedente = ${diff1}`);
+        log.push(`  diff1 = ${diff1} → Defender Front Line destroyed. Excess = ${diff1}`);
         if (dFront) result.destroyed.defenderFront = true;
         excess = diff1;
-        // En Caso A, la Rear Guard atacante ya cumplió su rol → no aporta Firepower adicional al Paso 2.
-        // La variable `aRear` la nuleamos lógicamente para el paso 2.
+        // In Case A, the Attacker Rear Guard already fulfilled its role → no additional Firepower for Step 2.
       }
     } else {
-      // Caso normal o Caso B: Front Line atacante existe
+      // Normal case or Case B: Attacker Front Line exists
       const aFrontFP = aFront.firepower + aMods.frontFirepowerBonus;
       const dFrontArmor = dFront ? (dFront.armor + dMods.frontArmorBonus) : 0;
 
       if (aMods.autoDestroyFront && dFront) {
-        log.push(`▸ Paso 1: Targeting Override → Front Line defensora destruida automáticamente. Atacante sobrevive. Sin excedente.`);
+        log.push(`▸ Step 1: Targeting Override → Defender Front Line auto-destroyed. Attacker survives. No excess.`);
         result.destroyed.defenderFront = true;
         step1Ended = true;
-        // Auto-destroy no genera excedente
+        // Auto-destroy generates no excess
       } else if (!dFront) {
-        // Defensor con FL vacía → Armor 0
-        log.push(`▸ Paso 1: Front Line defensora vacía (Armor 0). Atacante FP ${aFrontFP} pasa todo como excedente.`);
+        // Defender with empty FL → Armor 0
+        log.push(`▸ Step 1: Defender Front Line empty (Armor 0). Attacker FP ${aFrontFP} passes through as excess.`);
         excess = aFrontFP;
       } else {
-        log.push(`▸ Paso 1: Front Line atacante FP ${aFrontFP} vs Front Line defensora Armor ${dFrontArmor}`);
+        log.push(`▸ Step 1: Attacker Front Line FP ${aFrontFP} vs Defender Front Line Armor ${dFrontArmor}`);
         const diff1 = aFrontFP - dFrontArmor;
         if (diff1 < 0) {
-          log.push(`  diff1 = ${diff1} → Front Line atacante destruida. Fin del ataque.`);
+          log.push(`  diff1 = ${diff1} → Attacker Front Line destroyed. End of attack.`);
           result.destroyed.attackerFront = true;
           step1Ended = true;
         } else if (diff1 === 0) {
-          log.push(`  diff1 = 0 → ambas Front Lines destruidas. Fin del ataque.`);
+          log.push(`  diff1 = 0 → both Front Lines destroyed. End of attack.`);
           result.destroyed.attackerFront = true;
           result.destroyed.defenderFront = true;
           step1Ended = true;
         } else {
-          log.push(`  diff1 = ${diff1} → Front Line defensora destruida. Excedente = ${diff1}`);
+          log.push(`  diff1 = ${diff1} → Defender Front Line destroyed. Excess = ${diff1}`);
           result.destroyed.defenderFront = true;
           excess = diff1;
 
-          // Trampa Minefield del defensor: se activa cuando el atacante destruye la FL del defensor.
+          // Defender's Minefield trap: activates when attacker destroys defender's FL.
           if (defender.skill && defender.skill.card.id === SKILL_IDS.MINEFIELD && defender.skill.state === 'hidden') {
-            // Verificar si el atacante tiene Cyberattack que cancele la trampa
+            // Check if attacker has Cyberattack to cancel the trap
             if (attacker.skill && attacker.skill.card.id === SKILL_IDS.CYBERATTACK && attacker.skill.state === 'hidden') {
-              log.push(`🚫 Cyberattack del atacante cancela Minefield del defensor antes de aplicarse`);
+              log.push(`🚫 Attacker's Cyberattack cancels Defender's Minefield before it applies`);
               result.consumedSkills.push({ playerId: attackerId, skillId: SKILL_IDS.CYBERATTACK });
               result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_IDS.MINEFIELD });
             } else {
-              log.push(`💣 Minefield del defensor se activa: Front Line atacante también destruida, excedente anulado`);
+              log.push(`💣 Defender's Minefield activates: Attacker Front Line also destroyed, excess nullified`);
               result.destroyed.attackerFront = true;
               excess = 0;
               result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_IDS.MINEFIELD });
@@ -196,48 +195,48 @@ export function resolveAttack(game, attackerId, defenderId) {
       }
     }
 
-    // ─── Paso 2: Ataque a Rear Guard / Vida ───
+    // ─── Step 2: Attack on Rear Guard / Life ───
     if (!step1Ended && excess > 0 || (!step1Ended && excess === 0 && (aRear || aFront))) {
-      // EMP Pulse: si la FL atacante destruyó la FL defensora, el excedente va directo a vida ignorando Armor RG.
+      // EMP Pulse: if attacker FL destroyed defender FL, excess goes directly to life ignoring RG Armor.
       if (aMods.bypassRearArmor && excess > 0 && result.destroyed.defenderFront) {
-        log.push(`▸ Paso 2: EMP Pulse → excedente ${excess} ignora Armor de Rear Guard defensora y va directo a vida`);
+        log.push(`▸ Step 2: EMP Pulse → excess ${excess} ignores Defender Rear Guard Armor and goes directly to life`);
         result.lifeDamage += excess;
       } else {
-        // Determinar aporte de Firepower de la Rear Guard atacante
+        // Determine Attacker Rear Guard Firepower contribution
         let aRearFP = 0;
         if (aRear && aFront) {
-          // Caso normal: ambos slots atacantes presentes
+          // Normal case: both attacker slots present
           aRearFP = aRear.firepower;
         } else if (aRear && !aFront) {
-          // Caso A ya manejado en Paso 1 (la Rear Guard asumió rol). No vuelve a atacar.
+          // Case A already handled in Step 1 (Rear Guard took the role). Does not attack again.
           aRearFP = 0;
         } else if (!aRear && aFront) {
-          // Caso B: Rear Guard atacante vacía
+          // Case B: Attacker Rear Guard empty
           aRearFP = 0;
-          log.push(`▸ Caso B: Rear Guard atacante vacía (Firepower 0)`);
+          log.push(`▸ Case B: Attacker Rear Guard empty (Firepower 0)`);
         }
 
         const attackOnRear = aRearFP + excess;
 
         if (attackOnRear === 0) {
-          // Nada que atacar
+          // Nothing to attack
         } else if (dMods.rearInvulnerable) {
-          log.push(`▸ Paso 2: Emergency Repulsors → Rear Guard defensora invulnerable, ataque (${attackOnRear}) anulado`);
+          log.push(`▸ Step 2: Emergency Repulsors → Defender Rear Guard invulnerable, attack (${attackOnRear}) nullified`);
         } else if (!defender.rearGuard) {
-          // Defensor con RG vacía → Armor 0
-          log.push(`▸ Paso 2: Rear Guard defensora vacía (Armor 0). attackOnRear ${attackOnRear} pasa todo a vida.`);
+          // Defender with empty RG → Armor 0
+          log.push(`▸ Step 2: Defender Rear Guard empty (Armor 0). attackOnRear ${attackOnRear} passes through to life.`);
           result.lifeDamage += attackOnRear;
         } else {
           const dRearArmor = defender.rearGuard.armor + dMods.rearArmorBonus;
-          log.push(`▸ Paso 2: attackOnRear ${attackOnRear} (RG ${aRearFP} + excedente ${excess}) vs Rear Guard defensora Armor ${dRearArmor}`);
+          log.push(`▸ Step 2: attackOnRear ${attackOnRear} (RG ${aRearFP} + excess ${excess}) vs Defender Rear Guard Armor ${dRearArmor}`);
           const diff2 = attackOnRear - dRearArmor;
           if (diff2 < 0) {
-            log.push(`  diff2 = ${diff2} → Rear Guard defensora sobrevive. Atacante no se autodestruye. Fin del ataque.`);
+            log.push(`  diff2 = ${diff2} → Defender Rear Guard survives. Attacker does not self-destruct. End of attack.`);
           } else if (diff2 === 0) {
-            log.push(`  diff2 = 0 → Rear Guard defensora destruida. Sin daño a vida.`);
+            log.push(`  diff2 = 0 → Defender Rear Guard destroyed. No life damage.`);
             result.destroyed.defenderRear = true;
           } else {
-            log.push(`  diff2 = ${diff2} → Rear Guard defensora destruida. Daño a vida: ${diff2}`);
+            log.push(`  diff2 = ${diff2} → Defender Rear Guard destroyed. Life damage: ${diff2}`);
             result.destroyed.defenderRear = true;
             result.lifeDamage += diff2;
           }
@@ -245,9 +244,9 @@ export function resolveAttack(game, attackerId, defenderId) {
       }
     }
 
-    // En Double Shot la segunda pasada no acumula excedente del primero ni reusa las mismas variables.
+    // In Double Shot, the second pass does not accumulate excess from the first nor reuse the same variables.
     if (attackPasses > 1 && pass === 1) {
-      log.push(`━━ Fin pasada 1, comienza pasada 2 con Firepower original ━━`);
+      log.push(`━━ End of pass 1, starting pass 2 with original Firepower ━━`);
     }
   }
 
@@ -255,7 +254,7 @@ export function resolveAttack(game, attackerId, defenderId) {
   // Fase D: Aplicar Energy Shield (bloqueo de daño a vida)
   // ───────────────────────────────────────────────────────────────────
   if (dMods.blockLifeDamage && result.lifeDamage > 0) {
-    log.push(`🛡 Energy Shield bloquea ${result.lifeDamage} puntos de daño a vida`);
+    log.push(`🛡 Energy Shield blocks ${result.lifeDamage} points of life damage`);
     result.lifeDamage = 0;
   }
 
@@ -267,18 +266,18 @@ export function resolveAttack(game, attackerId, defenderId) {
     if (frontSurvived) {
       // Verificar si el atacante tiene Cyberattack que cancele la trampa
       if (attacker.skill && attacker.skill.card.id === SKILL_IDS.CYBERATTACK && attacker.skill.state === 'hidden') {
-        log.push(`🚫 Cyberattack del atacante cancela Trap Charge del defensor antes de aplicarse`);
+        log.push(`🚫 Attacker's Cyberattack cancels Defender's Trap Charge before it applies`);
         result.consumedSkills.push({ playerId: attackerId, skillId: SKILL_IDS.CYBERATTACK });
         result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_IDS.TRAP_CHARGE });
       } else {
-        log.push(`⚡ Trap Charge del defensor se activa: +5 Firepower a su próximo ataque (efecto diferido)`);
+        log.push(`⚡ Defender's Trap Charge activates: +5 Firepower on next attack (deferred effect)`);
         result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_IDS.TRAP_CHARGE });
         result.newPendingEffects.push({ playerId: defenderId, type: 'trap_charge', value: 5 });
       }
     }
   }
 
-  log.push(`▶ Ataque finalizado. Daño a vida: ${result.lifeDamage}`);
+  log.push(`▶ Attack finished. Life damage: ${result.lifeDamage}`);
 
   return result;
 }

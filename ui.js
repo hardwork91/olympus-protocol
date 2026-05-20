@@ -22,7 +22,7 @@ import {
 
 // Cache-busting: bump esta cadena cuando se actualicen imágenes para
 // forzar al navegador a redescargarlas en vez de servirlas de caché.
-const ASSET_VERSION = '19';
+const ASSET_VERSION = '21';
 
 // ──────────────────────────────────────────────────────────────────
 // Estado global del UI
@@ -154,7 +154,7 @@ async function handleCreate() {
     const config = {
       vidaInicial: parseInt($('config-vida').value, 10) || 20,
       maxTurnos: parseInt($('config-turnos').value, 10) || 20,
-      forceP1Start: $('config-force-p1').checked,
+      forceP1Start: false,
     };
     const { roomId: newRoomId } = await createRoom(config);
     roomId = newRoomId;

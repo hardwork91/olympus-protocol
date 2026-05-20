@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Olympus Protocol — Simulador</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Modal menú principal: Crear o Unirse -->
+  <div id="main-menu-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>OLYMPUS PROTOCOL</h2>
+      <p style="text-align:center;color:var(--text-dim);margin-bottom:24px;">Simulador 1v1 online · Fase 0</p>
+      <button id="btn-create" class="modal-btn-primary">Crear partida nueva</button>
+      <button id="btn-join" class="modal-btn-secondary">Unirme con código</button>
+    </div>
+  </div>
+
+  <!-- Modal crear partida -->
+  <div id="create-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Crear partida</h2>
+      <label>
+        Vida inicial (10-50):
+        <input id="config-vida" type="number" min="10" max="50" value="20" />
+      </label>
+      <label>
+        Turnos máximos (10-40):
+        <input id="config-turnos" type="number" min="10" max="40" value="20" />
+      </label>
+      <label>
+        <input id="config-force-p1" type="checkbox" />
+        Forzar Jugador 1 a empezar (debug)
+      </label>
+      <button id="btn-create-confirm" class="modal-btn-primary">Crear partida</button>
+      <button id="btn-create-cancel" class="modal-btn-secondary">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Modal unirse a partida -->
+  <div id="join-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Unirse a partida</h2>
+      <label>
+        Código de sala (6 caracteres):
+        <input id="join-code" type="text" maxlength="6" autocomplete="off" placeholder="ABC123" style="text-transform: uppercase; letter-spacing: 0.1em;" />
+      </label>
+      <div id="join-error" class="error-msg hidden"></div>
+      <button id="btn-join-confirm" class="modal-btn-primary">Unirme</button>
+      <button id="btn-join-cancel" class="modal-btn-secondary">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Modal de espera (P1 esperando a P2) -->
+  <div id="waiting-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2>Esperando jugador 2...</h2>
+      <p style="text-align:center;color:var(--text-dim);">Comparte este código:</p>
+      <div class="code-display" id="waiting-code">XXXXXX</div>
+      <button id="btn-copy-url" class="modal-btn-primary">Copiar URL</button>
+      <p style="text-align:center;color:var(--text-dim);font-size:11px;margin-top:16px;">
+        El rival debe abrir esta URL o introducir el código en "Unirme con código".<br>
+        <strong>Para testing en el mismo navegador:</strong> abre la URL en una ventana de incógnito (Ctrl+Shift+N).
+      </p>
+    </div>
+  </div>
+
+  <!-- Modal de fin de partida -->
+  <div id="endgame-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2 id="endgame-title">Fin de partida</h2>
+      <div id="endgame-stats"></div>
+      <button id="endgame-new" class="modal-btn-primary">Nueva partida</button>
+    </div>
+  </div>
+
+  <!-- App: 2 columnas (board + sidebar) -->
+  <div class="app">
+    <!-- Main area: board (player 2 arriba, player 1 abajo) -->
+    <main class="main-area">
+      <!-- Jugador 2 (arriba) -->
+      <section class="player p2" id="player-2">
+        <div class="slots-grid">
+          <div class="slot" data-player="2" data-slot="rearGuard"></div>
+          <div class="player-info" id="p2-display">
+            <div class="player-name">Jugador 2</div>
+            <div class="player-stat"><span class="stat-label">Tu vida</span><span class="stat-value player-life">❤ <span id="p2-life">20</span></span></div>
+            <div class="player-stat"><span class="stat-label">Enemigo</span><span class="stat-value enemy-life">❤ <span id="p2-enemy-life">20</span></span></div>
+            <div class="player-stat"><span class="stat-label">Turno</span><span class="stat-value" id="p2-display-turn">T1/20</span></div>
+            <div class="display-active" id="p2-display-active"></div>
+            <div class="display-pending" id="p2-display-pending"></div>
+          </div>
+          <div class="slot" data-player="2" data-slot="frontLine"></div>
+          <div class="slot" data-player="2" data-slot="skill"></div>
+        </div>
+        <div class="hand" id="p2-hand"></div>
+      </section>
+
+      <!-- Jugador 1 (abajo) -->
+      <section class="player p1" id="player-1">
+        <div class="slots-grid">
+          <div class="slot" data-player="1" data-slot="frontLine"></div>
+          <div class="slot" data-player="1" data-slot="skill"></div>
+          <div class="slot" data-player="1" data-slot="rearGuard"></div>
+          <div class="player-info" id="p1-display">
+            <div class="player-name">Jugador 1</div>
+            <div class="player-stat"><span class="stat-label">Tu vida</span><span class="stat-value player-life">❤ <span id="p1-life">20</span></span></div>
+            <div class="player-stat"><span class="stat-label">Enemigo</span><span class="stat-value enemy-life">❤ <span id="p1-enemy-life">20</span></span></div>
+            <div class="player-stat"><span class="stat-label">Turno</span><span class="stat-value" id="p1-display-turn">T1/20</span></div>
+            <div class="display-active" id="p1-display-active"></div>
+            <div class="display-pending" id="p1-display-pending"></div>
+          </div>
+        </div>
+        <div class="hand" id="p1-hand"></div>
+      </section>
+    </main>
+
+    <!-- Sidebar: header + log + action bar -->
+    <aside class="sidebar">
+      <header class="sidebar-header">
+        <h1>OLYMPUS PROTOCOL</h1>
+        <div class="sidebar-subtitle">Simulador 1v1 online · <span id="sidebar-seat-label">—</span></div>
+        <div class="sidebar-room-code" id="sidebar-room-code"></div>
+        <button id="menu-restart">Salir al menú</button>
+      </header>
+
+      <div class="combat-log" id="combat-log"></div>
+
+      <div class="action-bar" id="action-bar"></div>
+    </aside>
+  </div>
+
+  <script type="module" src="ui.js"></script>
+</body>
+</html>

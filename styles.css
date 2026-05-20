@@ -1,0 +1,645 @@
+/* ──────────────────────────────────────────────────────────────────
+   Olympus Protocol — Simulador (estilos)
+   Tema oscuro, cartas estilo Yu-Gi-Oh, tablero esquemático.
+   Layout: 2 columnas (board + sidebar). Sin scroll para el tablero.
+   ────────────────────────────────────────────────────────────────── */
+
+:root {
+  --bg-deep: #0a0e1a;
+  --bg-board: #1a2238;
+  --bg-panel: #232b44;
+  --text-light: #e2e8f0;
+  --text-dim: #94a3b8;
+  --gold: #fbbf24;
+  --gold-bright: #fcd34d;
+  --green: #4ade80;
+  --red: #f87171;
+  --amber: #fbbf24;
+  --purple: #c084fc;
+  --unit-frame: #3a4a6b;
+  --unit-frame-light: #5a6a8b;
+  --skill-frame: #6b3a8c;
+  --skill-frame-light: #8b5aac;
+  --subtype-assault: #c84a4a;
+  --subtype-tank: #7a7a7a;
+  --subtype-artillery: #c87a4a;
+  --subtype-support: #5aa05a;
+  --subtype-offensive: #d65a5a;
+  --subtype-defensive: #5a6bd6;
+  --subtype-trap: #9a3aca;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-light);
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* ─── Layout principal: 2 columnas (board + sidebar) ─── */
+.app {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  height: 100vh;
+  gap: 12px;
+  padding: 12px;
+  overflow: hidden;
+}
+
+/* ─── Main area: 2 filas (P2 arriba / P1 abajo) ─── */
+.main-area {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ─── Sidebar: header + log + action bar ─── */
+.sidebar {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 12px;
+  background: var(--bg-board);
+  border: 2px solid var(--bg-panel);
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  background: var(--bg-panel);
+  border: 1px solid var(--unit-frame);
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+}
+.sidebar-header h1 {
+  margin: 0;
+  color: var(--gold);
+  font-size: 15px;
+  letter-spacing: 0.08em;
+}
+.sidebar-subtitle {
+  color: var(--text-dim);
+  font-size: 10px;
+  margin: 4px 0 10px;
+}
+.sidebar-header button {
+  background: var(--bg-deep);
+  color: var(--text-light);
+  border: 1px solid var(--unit-frame);
+  padding: 6px 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.sidebar-header button:hover { background: var(--unit-frame); }
+
+/* ─── Áreas de jugador (2 columnas: slots-grid (incluye info) + hand) ─── */
+.player {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  background: var(--bg-board);
+  border: 2px solid var(--bg-panel);
+  border-radius: 8px;
+  padding: 10px;
+  transition: border-color 0.3s;
+  min-height: 0;
+  overflow: hidden;
+}
+.player.active {
+  border-color: var(--gold);
+  box-shadow: 0 0 16px rgba(251, 191, 36, 0.3);
+}
+.player.setup-current {
+  border-color: var(--green);
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.3);
+}
+
+/* ─── Player info card (ahora dentro del slots-grid, en el espacio del display físico) ─── */
+.player-info {
+  width: 144px;
+  height: 202px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: linear-gradient(180deg, #1a2238 0%, #0a0e1a 100%);
+  border: 2px solid var(--unit-frame);
+  border-radius: 6px;
+  padding: 10px 8px;
+  overflow: hidden;
+}
+.player-name {
+  font-weight: bold;
+  color: var(--gold);
+  font-size: 14px;
+  text-align: center;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--bg-panel);
+}
+.player-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+.stat-label { color: var(--text-dim); }
+.stat-value { color: var(--text-light); font-weight: bold; }
+.stat-value.player-life { color: var(--red); }
+.stat-value.enemy-life { color: var(--amber); }
+
+/* ─── Slots grid 2x2 ─── */
+.slots-grid {
+  display: grid;
+  grid-template-columns: minmax(135px, 153px) minmax(135px, 153px);
+  grid-template-rows: auto auto;
+  gap: 8px;
+  justify-content: start;
+  align-self: start;
+}
+
+/* Para P1 (abajo del tablero): front + skill arriba, rear + info-panel abajo */
+.player.p1 .slots-grid > .slot[data-slot="frontLine"] { grid-area: 1 / 1; }
+.player.p1 .slots-grid > .slot[data-slot="skill"]     { grid-area: 1 / 2; }
+.player.p1 .slots-grid > .slot[data-slot="rearGuard"] { grid-area: 2 / 1; }
+.player.p1 .slots-grid > .player-info                 { grid-area: 2 / 2; }
+
+/* Para P2 (arriba): rear + info-panel arriba, front + skill abajo */
+.player.p2 .slots-grid > .slot[data-slot="rearGuard"] { grid-area: 1 / 1; }
+.player.p2 .slots-grid > .player-info                 { grid-area: 1 / 2; }
+.player.p2 .slots-grid > .slot[data-slot="frontLine"] { grid-area: 2 / 1; }
+.player.p2 .slots-grid > .slot[data-slot="skill"]     { grid-area: 2 / 2; }
+
+/* ─── Cuando el jugador LOCAL es P2: flipear el layout vertical ───
+   P2 queda abajo (cerca del viewer), P1 arriba (oponente).
+   Los slots-grid de cada uno se reorganizan para que sus FL/Skill estén
+   hacia el centro del tablero y Rear/Info hacia su lado del viewer.       */
+.app[data-local-seat="2"] .main-area .player.p1 { order: 1; }
+.app[data-local-seat="2"] .main-area .player.p2 { order: 2; }
+
+/* P1 ahora arriba: arreglo igual al P2 estándar (Rear/Info arriba, FL/Skill abajo) */
+.app[data-local-seat="2"] .player.p1 .slots-grid > .slot[data-slot="rearGuard"] { grid-area: 1 / 1; }
+.app[data-local-seat="2"] .player.p1 .slots-grid > .player-info                 { grid-area: 1 / 2; }
+.app[data-local-seat="2"] .player.p1 .slots-grid > .slot[data-slot="frontLine"] { grid-area: 2 / 1; }
+.app[data-local-seat="2"] .player.p1 .slots-grid > .slot[data-slot="skill"]     { grid-area: 2 / 2; }
+
+/* P2 ahora abajo: arreglo igual al P1 estándar (FL/Skill arriba, Rear/Info abajo) */
+.app[data-local-seat="2"] .player.p2 .slots-grid > .slot[data-slot="frontLine"] { grid-area: 1 / 1; }
+.app[data-local-seat="2"] .player.p2 .slots-grid > .slot[data-slot="skill"]     { grid-area: 1 / 2; }
+.app[data-local-seat="2"] .player.p2 .slots-grid > .slot[data-slot="rearGuard"] { grid-area: 2 / 1; }
+.app[data-local-seat="2"] .player.p2 .slots-grid > .player-info                 { grid-area: 2 / 2; }
+
+/* ─── Slots ─── */
+.slot {
+  position: relative;
+  width: 144px;
+  height: 202px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px dashed var(--bg-panel);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  transition: all 0.2s;
+}
+.slot.empty .slot-label {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+}
+.slot.highlight {
+  border-color: var(--gold);
+  border-style: solid;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+  cursor: pointer;
+  background: rgba(251, 191, 36, 0.1);
+}
+.slot.highlight-replace {
+  border-color: var(--amber);
+  border-style: dashed;
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
+  cursor: pointer;
+}
+.slot.skill-active { box-shadow: 0 0 12px rgba(74, 222, 128, 0.5); }
+.slot.skill-hidden { box-shadow: 0 0 10px rgba(192, 132, 252, 0.4); }
+
+/* ─── Display panel del jugador (uno de los 4 quadrantes) ─── */
+.display {
+  width: 144px;
+  height: 202px;
+  background: linear-gradient(180deg, #1a2238 0%, #0a0e1a 100%);
+  border: 2px solid var(--unit-frame);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  color: var(--text-dim);
+  font-family: 'Consolas', monospace;
+  font-size: 11px;
+  gap: 6px;
+}
+.display-row { display: flex; gap: 8px; align-items: center; font-size: 11px; }
+.display-label { color: var(--text-dim); }
+.display-value { color: var(--gold); font-weight: bold; }
+.display-active { color: var(--green); font-weight: bold; font-size: 12px; }
+.display-pending { color: var(--purple); font-size: 10px; text-align: center; }
+
+/* ─── Cartas estilo Yu-Gi-Oh ─── */
+/* Tamaño BASE (cartas en el tablero, en slots) — reducido 10% */
+.card {
+  width: 135px;
+  height: 189px;
+  background: var(--bg-deep);
+  border: 3px solid var(--unit-frame);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  font-size: 9px;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+}
+/* Cartas en la MANO: más grandes para legibilidad (proporción carta de poker 5:7) */
+.card.in-hand {
+  width: 190px;
+  height: 266px;
+  font-size: 12px;
+}
+.card.unit { border-color: var(--unit-frame); background: linear-gradient(180deg, #1d2840 0%, #0d1424 100%); }
+.card.skill { border-color: var(--skill-frame); background: linear-gradient(180deg, #2a1a3a 0%, #14091e 100%); }
+
+/* Sub-tonos por subtipo */
+.card.unit.subtype-assault .card-top { background: linear-gradient(90deg, var(--unit-frame) 0%, var(--subtype-assault) 100%); }
+.card.unit.subtype-tank .card-top { background: linear-gradient(90deg, var(--unit-frame) 0%, var(--subtype-tank) 100%); }
+.card.unit.subtype-artillery .card-top { background: linear-gradient(90deg, var(--unit-frame) 0%, var(--subtype-artillery) 100%); }
+.card.unit.subtype-support .card-top { background: linear-gradient(90deg, var(--unit-frame) 0%, var(--subtype-support) 100%); }
+.card.skill.subtype-offensive .card-top { background: linear-gradient(90deg, var(--skill-frame) 0%, var(--subtype-offensive) 100%); }
+.card.skill.subtype-defensive .card-top { background: linear-gradient(90deg, var(--skill-frame) 0%, var(--subtype-defensive) 100%); }
+.card.skill.subtype-trap .card-top { background: linear-gradient(90deg, var(--skill-frame) 0%, var(--subtype-trap) 100%); }
+
+.card-top {
+  padding: 3px 5px;
+  font-weight: bold;
+  color: var(--text-light);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+.card.in-hand .card-top { padding: 5px 8px; font-size: 12px; }
+.card-id-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.card-image {
+  height: 99px;
+  background: linear-gradient(135deg, #2a3550 0%, #1a2235 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  position: relative;
+}
+.card.in-hand .card-image { height: 140px; }
+.card.skill .card-image { background: linear-gradient(135deg, #3a2a55 0%, #251535 100%); }
+.card-image-label {
+  font-size: 9px;
+  color: var(--text-dim);
+  font-style: italic;
+  text-align: center;
+  padding: 0 4px;
+}
+.card-image-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.card-body {
+  flex: 1;
+  padding: 3px 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+.card.in-hand .card-body { padding: 6px 8px; gap: 4px; }
+.card-subtype {
+  font-size: 7px;
+  color: var(--gold);
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.card.in-hand .card-subtype { font-size: 10px; }
+.card-desc {
+  font-size: 7px;
+  color: var(--text-dim);
+  line-height: 1.15;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.card.in-hand .card-desc { font-size: 10px; -webkit-line-clamp: 5; line-height: 1.25; }
+
+.card-bottom {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+.card.in-hand .card-bottom { padding: 6px 10px; }
+.card-fp { color: var(--red); font-weight: bold; font-size: 13px; }
+.card-armor { color: var(--green); font-weight: bold; font-size: 13px; }
+.card.in-hand .card-fp,
+.card.in-hand .card-armor { font-size: 18px; }
+
+/* Estados de skill */
+.card.state-hidden { filter: brightness(0.7); }
+.card.state-active { box-shadow: 0 0 16px rgba(74, 222, 128, 0.7); }
+.card.state-consumed { filter: brightness(0.5) sepia(1) hue-rotate(-30deg); }
+
+.eye-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 28px;
+  z-index: 5;
+  text-shadow: 0 0 6px black, 0 0 6px black;
+}
+
+/* ─── Carta seleccionada y en mano ─── */
+.card.in-hand { cursor: pointer; }
+.card.in-hand:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
+}
+.card.selected {
+  box-shadow: 0 0 14px var(--gold) !important;
+  transform: translateY(-6px);
+  border-color: var(--gold) !important;
+}
+
+/* ─── Hand ─── */
+.hand {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  align-content: flex-start;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ─── Combat log ─── */
+.combat-log {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--bg-panel);
+  border-radius: 6px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  font-family: 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  min-height: 0;
+}
+.log-entry { margin: 2px 0; color: var(--text-light); }
+.log-entry.log-animated {
+  animation: fadeIn 0.3s;
+  color: var(--gold-bright);
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Action bar ─── */
+.action-bar {
+  background: var(--bg-panel);
+  border: 1px solid var(--unit-frame);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.action-status {
+  flex-basis: 100%;
+  color: var(--gold);
+  font-weight: bold;
+  font-size: 12px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--bg-deep);
+  margin-bottom: 4px;
+}
+.action-warn {
+  flex-basis: 100%;
+  color: var(--red);
+  font-size: 11px;
+  padding: 4px 0;
+}
+
+.btn {
+  background: var(--bg-deep);
+  color: var(--text-light);
+  border: 1px solid var(--unit-frame);
+  padding: 6px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  transition: all 0.15s;
+}
+.btn:hover { background: var(--unit-frame); transform: translateY(-1px); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn-mulligan { border-color: var(--purple); color: var(--purple); }
+.btn-confirm { border-color: var(--green); color: var(--green); }
+.btn-replace { border-color: var(--gold); color: var(--gold); }
+.btn-cancel { border-color: var(--red); color: var(--red); }
+.btn-end-turn { border-color: var(--gold-bright); color: var(--gold-bright); font-size: 12px; }
+.btn-end-turn:hover:not(:disabled) { background: var(--gold); color: black; }
+.btn-draw { border-color: var(--text-dim); }
+.btn-next { border-color: var(--green); color: var(--green); }
+
+/* ─── Modal ─── */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal.hidden { display: none; }
+.modal-content {
+  background: var(--bg-board);
+  border: 2px solid var(--gold);
+  border-radius: 8px;
+  padding: 32px;
+  min-width: 360px;
+  max-width: 500px;
+}
+.modal-content h2 {
+  margin: 0 0 20px;
+  color: var(--gold);
+  text-align: center;
+}
+.modal-content label {
+  display: block;
+  margin: 12px 0;
+  color: var(--text-light);
+}
+.modal-content input[type="number"] {
+  width: 80px;
+  padding: 4px 6px;
+  background: var(--bg-deep);
+  color: var(--text-light);
+  border: 1px solid var(--unit-frame);
+  border-radius: 4px;
+  font-size: 13px;
+  margin-left: 8px;
+}
+.modal-content input[type="checkbox"] { margin-right: 6px; }
+.modal-content button {
+  background: var(--gold);
+  color: var(--bg-deep);
+  border: none;
+  padding: 10px 24px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  display: block;
+  margin: 24px auto 0;
+}
+.modal-content button:hover { background: var(--gold-bright); }
+#endgame-stats { color: var(--text-light); margin: 16px 0; }
+#endgame-stats p { margin: 6px 0; }
+
+.hidden { display: none !important; }
+
+/* ─── Botones modal: primario / secundario ─── */
+.modal-btn-primary,
+.modal-btn-secondary {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  margin: 8px 0 0 0;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.modal-btn-primary {
+  background: var(--gold);
+  color: var(--bg-deep);
+}
+.modal-btn-primary:hover { background: var(--gold-bright); }
+.modal-btn-secondary {
+  background: transparent;
+  color: var(--text-light);
+  border: 1px solid var(--unit-frame);
+}
+.modal-btn-secondary:hover { background: var(--unit-frame); }
+
+/* Override del botón legacy en modales */
+.modal-content button.modal-btn-primary,
+.modal-content button.modal-btn-secondary {
+  margin: 8px auto 0;
+}
+
+/* ─── Display del código de sala en waiting-modal ─── */
+.code-display {
+  font-family: 'Consolas', monospace;
+  font-size: 36px;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  text-align: center;
+  background: var(--bg-deep);
+  border: 2px solid var(--gold);
+  border-radius: 6px;
+  padding: 16px;
+  margin: 16px 0;
+}
+
+/* ─── Mensaje de error en modales ─── */
+.error-msg {
+  color: var(--red);
+  font-size: 12px;
+  padding: 8px 0;
+  text-align: center;
+}
+
+/* ─── Código de sala en el sidebar ─── */
+.sidebar-room-code {
+  color: var(--gold);
+  font-family: 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: bold;
+  letter-spacing: 0.15em;
+  margin: 6px 0 10px;
+}
+
+/* ─── Carta no clicable (mano del rival) ─── */
+.card.in-hand.not-clickable {
+  cursor: default;
+  opacity: 0.85;
+}
+.card.in-hand.not-clickable:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* ─── Dorso de carta (mano y skills bocaabajo del rival) ─── */
+.card.card-back {
+  background: var(--bg-deep);
+  border: 3px solid var(--unit-frame);
+  border-radius: 6px;
+  position: relative;
+  overflow: hidden;
+  display: block;
+  padding: 0;
+}
+.card-back-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.card.card-back.card-back-fallback {
+  background: linear-gradient(135deg, #2a3550 0%, #1a2235 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-back-label {
+  color: var(--gold);
+  font-size: 48px;
+  font-weight: bold;
+}
+
+/* ─── Resaltado del asiento local ─── */
+.player.local-seat .player-name { color: var(--gold-bright); }

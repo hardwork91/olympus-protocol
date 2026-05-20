@@ -130,19 +130,26 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: linear-gradient(180deg, #1a2238 0%, #0a0e1a 100%);
-  border: 2px solid var(--unit-frame);
-  border-radius: 6px;
-  padding: 10px 8px;
+  background: url('images/info.png?v=27') center/cover no-repeat,
+              linear-gradient(180deg, #1a2238 0%, #0a0e1a 100%);
+  border: none;
+  border-radius: 0.5cqi;
+  padding: 8px 15px 10px;
   overflow: hidden;
+  container-type: inline-size;
+  font-family: 'Times New Roman', 'Georgia', serif;
+  font-weight: bolder;
 }
 .player-name {
+  font-family: 'Asimovian', 'Times New Roman', serif;
   font-weight: bold;
-  color: var(--gold);
-  font-size: 14px;
+  color: #c2b9aa;
+  font-size: 16px;
   text-align: center;
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--bg-panel);
+  letter-spacing: 0.04em;
+  padding-bottom: 2px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9),
+               0 0 3px rgba(0, 0, 0, 0.8);
 }
 .player-stat {
   display: flex;
@@ -150,10 +157,10 @@ body {
   align-items: center;
   font-size: 12px;
 }
-.stat-label { color: var(--text-dim); }
-.stat-value { color: var(--text-light); font-weight: bold; }
-.stat-value.player-life { color: var(--red); }
-.stat-value.enemy-life { color: var(--amber); }
+.stat-label { color: #321200; }
+.stat-value { color: #321200; font-weight: bold; }
+.stat-value.player-life { color: #321200; }
+.stat-value.enemy-life { color: #321200; }
 
 /* ─── Slots grid 2x2 ─── */
 .slots-grid {
@@ -202,13 +209,15 @@ body {
   width: 144px;
   height: 202px;
   background: rgba(0, 0, 0, 0.3);
-  border: 2px dashed var(--bg-panel);
-  border-radius: 6px;
+  border: none;
+  border-radius: 0.5cqi;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: default;
   transition: all 0.2s;
+  container-type: inline-size;
+  overflow: hidden;
 }
 .slot.empty .slot-label {
   color: var(--text-dim);
@@ -216,16 +225,22 @@ body {
   font-weight: bold;
   letter-spacing: 0.1em;
 }
+.slot-icon {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  opacity: 0.85;
+  pointer-events: none;
+  border-radius: 0.5cqi;
+}
 .slot.highlight {
-  border-color: var(--gold);
-  border-style: solid;
+  border: 2px solid var(--gold);
   box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
   cursor: pointer;
   background: rgba(251, 191, 36, 0.1);
 }
 .slot.highlight-replace {
-  border-color: var(--amber);
-  border-style: dashed;
+  border: 2px dashed var(--amber);
   box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
   cursor: pointer;
 }
@@ -250,10 +265,10 @@ body {
   gap: 6px;
 }
 .display-row { display: flex; gap: 8px; align-items: center; font-size: 11px; }
-.display-label { color: var(--text-dim); }
-.display-value { color: var(--gold); font-weight: bold; }
-.display-active { color: var(--green); font-weight: bold; font-size: 12px; }
-.display-pending { color: var(--purple); font-size: 10px; text-align: center; }
+.display-label { color: #321200; }
+.display-value { color: #321200; font-weight: bold; }
+.display-active { color: #321200; font-weight: bold; font-size: 12px; }
+.display-pending { color: #321200; font-size: 10px; text-align: center; }
 
 /* ─── Cartas de UNIDAD con frame.png overlay ───
    Layout: imagen unidad como fondo + frame PNG encima + texto absoluto.
@@ -271,7 +286,7 @@ body {
   display: block;
   container-type: inline-size;
   flex-shrink: 0;
-  border-radius: 0;
+  border-radius: 0.5cqi;
 }
 
 .unit-bg-img {
@@ -317,6 +332,7 @@ body {
   font-size: 9.5cqi;
   letter-spacing: 0.04em;
   text-align: center;
+  font-family: 'Asimovian', 'Times New Roman', serif;
 }
 
 .frame-fp {
@@ -720,11 +736,16 @@ body {
 .card.card-back {
   background: var(--bg-deep);
   border: none;
-  border-radius: 6px;
+  border-radius: 0.5cqi;
   position: relative;
   overflow: hidden;
   display: block;
   padding: 0;
+}
+/* Cuando un dorso está dentro de un slot (no en la mano), ocupa todo el slot. */
+.slot .card.card-back {
+  width: 100%;
+  height: 100%;
 }
 .card-back-img {
   width: 100%;
@@ -744,5 +765,4 @@ body {
   font-weight: bold;
 }
 
-/* ─── Resaltado del asiento local ─── */
-.player.local-seat .player-name { color: var(--gold-bright); }
+/* ─── Resaltado del asiento local (sin tocar el color del nombre) ─── */

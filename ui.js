@@ -22,7 +22,7 @@ import {
 
 // Cache-busting: bump esta cadena cuando se actualicen imágenes para
 // forzar al navegador a redescargarlas en vez de servirlas de caché.
-const ASSET_VERSION = '23';
+const ASSET_VERSION = '28';
 
 // ──────────────────────────────────────────────────────────────────
 // Estado global del UI
@@ -321,7 +321,13 @@ function renderSlot(playerId, slotName, card) {
       slotEl.appendChild(renderCardEl(card));
     }
   } else {
-    slotEl.appendChild(el('div', 'slot-label', slotName === 'frontLine' ? 'FRONT LINE' : 'REAR GUARD'));
+    // Slot vacío: muestra el icono de attack (Front Line) o defense (Rear Guard).
+    const iconSrc = slotName === 'frontLine' ? 'images/attack.png' : 'images/defense.png';
+    const iconEl = document.createElement('img');
+    iconEl.src = `${iconSrc}?v=${ASSET_VERSION}`;
+    iconEl.alt = slotName === 'frontLine' ? 'Front Line' : 'Rear Guard';
+    iconEl.className = 'slot-icon';
+    slotEl.appendChild(iconEl);
   }
 
   if (selectedCardInstanceId && selectedPlayerId && !isAnimating && localSeat === selectedPlayerId) {
@@ -355,7 +361,11 @@ function renderSkillSlot(playerId, skillState) {
     slotEl.classList.add(`skill-${skillState.state}`);
   } else {
     slotEl.classList.add('empty');
-    slotEl.appendChild(el('div', 'slot-label', 'SKILL'));
+    const iconEl = document.createElement('img');
+    iconEl.src = `images/skill.png?v=${ASSET_VERSION}`;
+    iconEl.alt = 'Skill';
+    iconEl.className = 'slot-icon';
+    slotEl.appendChild(iconEl);
   }
 
   if (selectedCardInstanceId && selectedPlayerId === playerId && !isAnimating && localSeat === selectedPlayerId) {

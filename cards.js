@@ -3,18 +3,30 @@
 // Las habilidades (13-22) son únicas: 1 copia cada una.
 
 export const UNITS = [
-  { id: 1,  name: 'Heracles',   subtype: 'Assault',    firepower: 6, armor: 3, copies: 2, image: 'images/1-heracles.png' },
-  { id: 2,  name: 'Ares',       subtype: 'Assault',    firepower: 7, armor: 2, copies: 2, image: 'images/2-ares.jpg' },
-  { id: 3,  name: 'Typhon',     subtype: 'Assault',    firepower: 5, armor: 4, copies: 3, image: 'images/3-typhon.jpg' },
-  { id: 4,  name: 'Atlas',      subtype: 'Tank',       firepower: 2, armor: 8, copies: 2, image: 'images/4-atlas.jpg' },
-  { id: 5,  name: 'Goliath',    subtype: 'Tank',       firepower: 3, armor: 7, copies: 2, image: 'images/5-goliath.jpg' },
-  { id: 6,  name: 'Cronos',     subtype: 'Tank',       firepower: 4, armor: 6, copies: 3, image: 'images/6-cronos.png' },
-  { id: 7,  name: 'Apollo',     subtype: 'Artillery',  firepower: 5, armor: 2, copies: 2, image: 'images/7-apollo.png' },
-  { id: 8,  name: 'Zeus',       subtype: 'Artillery',  firepower: 6, armor: 3, copies: 2, image: 'images/8-zeus.png' },
-  { id: 9,  name: 'Helios',     subtype: 'Artillery',  firepower: 4, armor: 4, copies: 3, image: 'images/9-helios.jpg' },
-  { id: 10, name: 'Hermes',     subtype: 'Support',    firepower: 3, armor: 5, copies: 3, image: 'images/10-hermes.jpg' },
-  { id: 11, name: 'Athena',     subtype: 'Support',    firepower: 4, armor: 5, copies: 3, image: 'images/11-athena.png' },
-  { id: 12, name: 'Hephaestus', subtype: 'Support',    firepower: 2, armor: 6, copies: 3, image: 'images/12-hephaestus.jpg' },
+  { id: 1,  name: 'Heracles',   subtype: 'Assault',    firepower: 6, armor: 3, copies: 2, image: 'images/1-heracles.png',
+    lore: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.' },
+  { id: 2,  name: 'Ares',       subtype: 'Assault',    firepower: 7, armor: 2, copies: 2, image: 'images/2-ares.jpg',
+    lore: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip.' },
+  { id: 3,  name: 'Typhon',     subtype: 'Assault',    firepower: 5, armor: 4, copies: 3, image: 'images/3-typhon.jpg',
+    lore: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore.' },
+  { id: 4,  name: 'Atlas',      subtype: 'Tank',       firepower: 2, armor: 8, copies: 2, image: 'images/4-atlas.jpg',
+    lore: 'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt.' },
+  { id: 5,  name: 'Goliath',    subtype: 'Tank',       firepower: 3, armor: 7, copies: 2, image: 'images/5-goliath.jpg',
+    lore: 'Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque.' },
+  { id: 6,  name: 'Cronos',     subtype: 'Tank',       firepower: 4, armor: 6, copies: 3, image: 'images/6-cronos.png',
+    lore: 'Neque porro quisquam est, qui dolorem ipsum quia dolor sit amet consectetur.' },
+  { id: 7,  name: 'Apollo',     subtype: 'Artillery',  firepower: 5, armor: 2, copies: 2, image: 'images/7-apollo.png',
+    lore: 'Eveniet ut enim ad minima veniam, quis nostrum exercitationem ullam corporis suscipit.' },
+  { id: 8,  name: 'Zeus',       subtype: 'Artillery',  firepower: 6, armor: 3, copies: 2, image: 'images/8-zeus.png',
+    lore: 'At vero eos et accusamus et iusto odio dignissimos ducimus qui blanditiis praesentium.' },
+  { id: 9,  name: 'Helios',     subtype: 'Artillery',  firepower: 4, armor: 4, copies: 3, image: 'images/9-helios.jpg',
+    lore: 'Temporibus autem quibusdam et aut officiis debitis aut rerum necessitatibus saepe.' },
+  { id: 10, name: 'Hermes',     subtype: 'Support',    firepower: 3, armor: 5, copies: 3, image: 'images/10-hermes.jpg',
+    lore: 'Itaque earum rerum hic tenetur a sapiente delectus, ut aut reiciendis voluptatibus.' },
+  { id: 11, name: 'Athena',     subtype: 'Support',    firepower: 4, armor: 5, copies: 3, image: 'images/11-athena.png',
+    lore: 'Voluptatibus maiores alias consequatur aut perferendis doloribus asperiores repellat.' },
+  { id: 12, name: 'Hephaestus', subtype: 'Support',    firepower: 2, armor: 6, copies: 3, image: 'images/12-hephaestus.jpg',
+    lore: 'Nemo enim ipsam voluptatem quia voluptas sit aspernatur aut odit aut fugit.' },
 ];
 
 export const SKILLS = [
@@ -47,6 +59,7 @@ export function buildDeck() {
         armor: unit.armor,
       };
       if (unit.image) card.image = unit.image;
+      if (unit.lore) card.lore = unit.lore;
       deck.push(card);
     }
   }

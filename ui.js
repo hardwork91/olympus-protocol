@@ -20,6 +20,10 @@ import {
   getRoomIdFromURL, buildRoomURL, setRoomInURL,
 } from './room.js';
 
+// Cache-busting: bump esta cadena cuando se actualicen imágenes para
+// forzar al navegador a redescargarlas en vez de servirlas de caché.
+const ASSET_VERSION = '12';
+
 // ──────────────────────────────────────────────────────────────────
 // Estado global del UI
 // ──────────────────────────────────────────────────────────────────
@@ -382,7 +386,7 @@ function renderHand(playerId, hand) {
 function renderCardBackEl() {
   const cardEl = el('div', 'card card-back');
   const img = document.createElement('img');
-  img.src = 'images/back.jpg';
+  img.src = `images/back.jpg?v=${ASSET_VERSION}`;
   img.alt = 'Card back';
   img.className = 'card-back-img';
   img.onerror = () => {
@@ -395,6 +399,45 @@ function renderCardBackEl() {
 }
 
 function renderCardEl(card) {
+  // Unidades usan el nuevo frame con imagen + overlay PNG + texto posicionado.
+  if (card.type === 'unit') {
+    return renderUnitFrameCard(card);
+  }
+  // Habilidades siguen usando el render clásico CSS (sin frame).
+  return renderSkillCardClassic(card);
+}
+
+// Render para cartas de unidad: imagen de fondo + frame.png encima + texto absolute-positioned
+// según las coordenadas del frame (1347×1973 px).
+function renderUnitFrameCard(card) {
+  const cardEl = el('div', `card unit unit-frame-card subtype-${card.subtype.toLowerCase()}`);
+
+  // Capa 1: imagen de la unidad (background)
+  if (card.image) {
+    const unitImg = document.createElement('img');
+    unitImg.src = `${card.image}?v=${ASSET_VERSION}`;
+    unitImg.alt = card.name;
+    unitImg.className = 'unit-bg-img';
+    cardEl.appendChild(unitImg);
+  }
+
+  // Capa 2: frame PNG encima
+  const frameImg = document.createElement('img');
+  frameImg.src = `images/frame.png?v=${ASSET_VERSION}`;
+  frameImg.alt = '';
+  frameImg.className = 'unit-frame-img';
+  cardEl.appendChild(frameImg);
+
+  // Capa 3: texto posicionado según las coordenadas del frame
+  cardEl.appendChild(el('div', 'frame-name', card.name));
+  cardEl.appendChild(el('div', 'frame-fp', String(card.firepower)));
+  cardEl.appendChild(el('div', 'frame-ar', String(card.armor)));
+  cardEl.appendChild(el('div', 'frame-desc', card.lore || ''));
+
+  return cardEl;
+}
+
+function renderSkillCardClassic(card) {
   const cardEl = el('div', `card ${card.type} subtype-${card.subtype.toLowerCase()}`);
 
   const top = el('div', 'card-top');
@@ -404,7 +447,7 @@ function renderCardEl(card) {
   const img = el('div', 'card-image');
   if (card.image) {
     const imgEl = document.createElement('img');
-    imgEl.src = card.image;
+    imgEl.src = `${card.image}?v=${ASSET_VERSION}`;
     imgEl.alt = card.name;
     imgEl.className = 'card-image-img';
     imgEl.onerror = () => {
@@ -419,19 +462,8 @@ function renderCardEl(card) {
 
   const body = el('div', 'card-body');
   body.appendChild(el('div', 'card-subtype', card.subtype));
-  if (card.type === 'unit') {
-    body.appendChild(el('div', 'card-desc', 'Lore TBD'));
-  } else {
-    body.appendChild(el('div', 'card-desc', card.effect));
-  }
+  body.appendChild(el('div', 'card-desc', card.effect));
   cardEl.appendChild(body);
-
-  if (card.type === 'unit') {
-    const bottom = el('div', 'card-bottom');
-    bottom.appendChild(el('div', 'card-fp', `⚔ ${card.firepower}`));
-    bottom.appendChild(el('div', 'card-armor', `🛡 ${card.armor}`));
-    cardEl.appendChild(bottom);
-  }
 
   return cardEl;
 }

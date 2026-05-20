@@ -255,6 +255,99 @@ body {
 .display-active { color: var(--green); font-weight: bold; font-size: 12px; }
 .display-pending { color: var(--purple); font-size: 10px; text-align: center; }
 
+/* ─── Cartas de UNIDAD con frame.png overlay ───
+   Layout: imagen unidad como fondo + frame PNG encima + texto absoluto.
+   Posiciones de texto basadas en el frame original (1347×1973 px):
+     - Nombre en (200, 90)   → 14.84% / 4.56%
+     - FP en (1327, 244)     → 98.5% / 12.37%
+     - Armor en (1327, 1400) → 98.5% / 70.96%                       */
+.card.unit-frame-card {
+  background: transparent;
+  border: none;
+  padding: 0;
+  position: relative;
+  overflow: hidden;
+  display: block;
+  container-type: inline-size;
+  flex-shrink: 0;
+  border-radius: 0;
+}
+
+.unit-bg-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  z-index: 1;
+  display: block;
+}
+
+.unit-frame-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
+  display: block;
+}
+
+.frame-name,
+.frame-fp,
+.frame-ar {
+  position: absolute;
+  z-index: 3;
+  color: #c2b9aa;
+  font-weight: bold;
+  font-family: 'Times New Roman', 'Georgia', serif;
+  line-height: 1;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9),
+               0 0 3px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.frame-name {
+  left: 12.84%;
+  top: 3.1%;
+  font-size: 9.5cqi;
+  letter-spacing: 0.04em;
+}
+
+.frame-fp {
+  left: 23.11%;
+  top: 69.2%;
+  font-size: 10cqi;
+  transform: translate(-50%, -50%);
+}
+
+.frame-ar {
+  left: 81.63%;
+  top: 69.2%;
+  font-size: 10cqi;
+  transform: translate(-50%, -50%);
+}
+
+/* Descripción / lore en el pergamino inferior. Texto en bold marrón oscuro,
+   formato párrafo que envuelve. */
+.frame-desc {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  left: 11%;
+  right: 11%;
+  top: 76.9%;
+  font-size: 6cqi;
+  color: #321200;
+  font-family: 'Times New Roman', 'Georgia', serif;
+  font-weight: bold;
+  line-height: 1;
+  text-align: justify;
+  white-space: normal;
+}
+
 /* ─── Cartas estilo Yu-Gi-Oh ─── */
 /* Tamaño BASE (cartas en el tablero, en slots) — reducido 10% */
 .card {
@@ -322,6 +415,7 @@ body {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center top;
   display: block;
 }
 

@@ -22,7 +22,7 @@ import {
 
 // Cache-busting: bump esta cadena cuando se actualicen imágenes para
 // forzar al navegador a redescargarlas en vez de servirlas de caché.
-const ASSET_VERSION = '12';
+const ASSET_VERSION = '13';
 
 // ──────────────────────────────────────────────────────────────────
 // Estado global del UI
@@ -386,7 +386,7 @@ function renderHand(playerId, hand) {
 function renderCardBackEl() {
   const cardEl = el('div', 'card card-back');
   const img = document.createElement('img');
-  img.src = `images/back.jpg?v=${ASSET_VERSION}`;
+  img.src = `images/back.png?v=${ASSET_VERSION}`;
   img.alt = 'Card back';
   img.className = 'card-back-img';
   img.onerror = () => {

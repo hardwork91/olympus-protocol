@@ -261,7 +261,8 @@ body {
      - Nombre en (200, 90)   → 14.84% / 4.56%
      - FP en (1327, 244)     → 98.5% / 12.37%
      - Armor en (1327, 1400) → 98.5% / 70.96%                       */
-.card.unit-frame-card {
+.card.unit-frame-card,
+.card.skill-frame-card {
   background: transparent;
   border: none;
   padding: 0;
@@ -344,8 +345,14 @@ body {
   font-family: 'Times New Roman', 'Georgia', serif;
   font-weight: bold;
   line-height: 1;
-  text-align: justify;
+  text-align: center;
   white-space: normal;
+}
+
+/* Override solo para skills: descripción más arriba (no tienen FP/Armor que ocupen
+   la zona media, así que el texto puede empezar antes). */
+.card.skill-frame-card .frame-desc {
+  top: 67.5%;
 }
 
 /* ─── Cartas estilo Yu-Gi-Oh ─── */
@@ -710,7 +717,7 @@ body {
 /* ─── Dorso de carta (mano y skills bocaabajo del rival) ─── */
 .card.card-back {
   background: var(--bg-deep);
-  border: 3px solid var(--unit-frame);
+  border: none;
   border-radius: 6px;
   position: relative;
   overflow: hidden;

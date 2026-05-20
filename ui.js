@@ -22,7 +22,7 @@ import {
 
 // Cache-busting: bump esta cadena cuando se actualicen imágenes para
 // forzar al navegador a redescargarlas en vez de servirlas de caché.
-const ASSET_VERSION = '13';
+const ASSET_VERSION = '19';
 
 // ──────────────────────────────────────────────────────────────────
 // Estado global del UI
@@ -399,12 +399,11 @@ function renderCardBackEl() {
 }
 
 function renderCardEl(card) {
-  // Unidades usan el nuevo frame con imagen + overlay PNG + texto posicionado.
+  // Unidades usan frame.png; habilidades usan skill-frame.png.
   if (card.type === 'unit') {
     return renderUnitFrameCard(card);
   }
-  // Habilidades siguen usando el render clásico CSS (sin frame).
-  return renderSkillCardClassic(card);
+  return renderSkillFrameCard(card);
 }
 
 // Render para cartas de unidad: imagen de fondo + frame.png encima + texto absolute-positioned
@@ -437,33 +436,30 @@ function renderUnitFrameCard(card) {
   return cardEl;
 }
 
-function renderSkillCardClassic(card) {
-  const cardEl = el('div', `card ${card.type} subtype-${card.subtype.toLowerCase()}`);
+// Render para cartas de skill: imagen de fondo + skill-frame.png encima + nombre + descripción.
+// Reusa las clases CSS de unit-frame-card (mismo posicionamiento de nombre y descripción).
+function renderSkillFrameCard(card) {
+  const cardEl = el('div', `card skill skill-frame-card subtype-${card.subtype.toLowerCase()}`);
 
-  const top = el('div', 'card-top');
-  top.appendChild(el('div', 'card-id-name', `#${card.id} ${card.name.toUpperCase()}`));
-  cardEl.appendChild(top);
-
-  const img = el('div', 'card-image');
+  // Capa 1: imagen de la skill (background)
   if (card.image) {
-    const imgEl = document.createElement('img');
-    imgEl.src = `${card.image}?v=${ASSET_VERSION}`;
-    imgEl.alt = card.name;
-    imgEl.className = 'card-image-img';
-    imgEl.onerror = () => {
-      img.innerHTML = '';
-      img.appendChild(el('div', 'card-image-label', card.name));
-    };
-    img.appendChild(imgEl);
-  } else {
-    img.appendChild(el('div', 'card-image-label', card.name));
+    const skillImg = document.createElement('img');
+    skillImg.src = `${card.image}?v=${ASSET_VERSION}`;
+    skillImg.alt = card.name;
+    skillImg.className = 'unit-bg-img';
+    cardEl.appendChild(skillImg);
   }
-  cardEl.appendChild(img);
 
-  const body = el('div', 'card-body');
-  body.appendChild(el('div', 'card-subtype', card.subtype));
-  body.appendChild(el('div', 'card-desc', card.effect));
-  cardEl.appendChild(body);
+  // Capa 2: frame PNG específico de skills
+  const frameImg = document.createElement('img');
+  frameImg.src = `images/skill-frame.png?v=${ASSET_VERSION}`;
+  frameImg.alt = '';
+  frameImg.className = 'unit-frame-img';
+  cardEl.appendChild(frameImg);
+
+  // Capa 3: nombre + descripción (reusan las mismas clases que unidades)
+  cardEl.appendChild(el('div', 'frame-name', card.name));
+  cardEl.appendChild(el('div', 'frame-desc', card.effect || ''));
 
   return cardEl;
 }

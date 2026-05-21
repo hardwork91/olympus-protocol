@@ -1,0 +1,36 @@
+/* Global base styles. Variables del tema y reset mínimo. Los estilos
+   específicos (fancy-border, cards, etc.) llegan en la Fase 5. */
+
+:root {
+  /* Paleta base — espejada del simulator vanilla */
+  --bg-deep: #0a0e1a;
+  --bg-board: #1a2238;
+  --bg-panel: #232b44;
+  --text-light: #e2e8f0;
+  --text-dim: #94a3b8;
+  --gold: #fbbf24;
+  --gold-bright: #fcd34d;
+  --green: #4ade80;
+  --red: #f87171;
+  --purple: #c084fc;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg-deep);
+  color: var(--text-light);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+#root {
+  min-height: 100%;
+}

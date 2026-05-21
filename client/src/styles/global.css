@@ -127,7 +127,7 @@ button:disabled {
    ────────────────────────────────────────────────────────────────── */
 .fancy-border {
   position: relative;
-  padding: 24px;
+  padding: 18px;
   isolation: isolate;
 }
 .fancy-border::after {

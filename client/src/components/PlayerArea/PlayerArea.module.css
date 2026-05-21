@@ -1,5 +1,5 @@
 .area {
-  /* fancy-border ya añade position:relative, padding:24px, isolation */
+  /* fancy-border ya añade position:relative + padding:18px + isolation */
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 12px;

@@ -7,6 +7,8 @@
 // Llamar UNA VEZ al iniciar la app (en main.tsx).
 // ============================================================================
 
+import { asset } from '@utils/asset';
+
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -19,8 +21,8 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 export async function setupFancyBorder(): Promise<void> {
   try {
     const [corner, edge] = await Promise.all([
-      loadImage('/images/corner.png'),
-      loadImage('/images/border.png'),
+      loadImage(asset('/images/corner.png')),
+      loadImage(asset('/images/border.png')),
     ]);
     const W = corner.width; // corners asumidos cuadrados (W×W). Ej. 42
     const E = edge.width; // edge horizontal: ancho variable, alto = W

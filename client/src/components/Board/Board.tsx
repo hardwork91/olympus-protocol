@@ -17,6 +17,7 @@ import * as gameService from '@services/gameService';
 import type { PlayerId, SerializedGameState, SlotIndicator } from '@shared/types';
 import { otherPlayer } from '@shared/types';
 import { useUIStore } from '@store/uiStore';
+import { asset } from '@utils/asset';
 import clsx from 'clsx';
 import styles from './Board.module.css';
 
@@ -136,13 +137,13 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
         {/* Decoraciones flotantes (no interactivas) — última pos en DOM →
             pintan encima por orden de documento. */}
         <div className={styles.attackIcon} aria-hidden="true">
-          <img src="/images/attack-icon.png" alt="" />
+          <img src={asset('/images/attack-icon.png')} alt="" />
         </div>
         <div className={clsx(styles.fly, styles.flyRight)} aria-hidden="true">
-          <img src="/images/fly.png" alt="" />
+          <img src={asset('/images/fly.png')} alt="" />
         </div>
         <div className={clsx(styles.fly, styles.flyLeft)} aria-hidden="true">
-          <img src="/images/fly.png" alt="" />
+          <img src={asset('/images/fly.png')} alt="" />
         </div>
       </main>
 
@@ -152,7 +153,7 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
           Va como hijo de .app (no del sidebar) para no ser recortado por
           el overflow:hidden del sidebar. */}
       <div className={styles.sidebarDeco} aria-hidden="true">
-        <img src="/images/sider-header.png" alt="" />
+        <img src={asset('/images/sider-header.png')} alt="" />
       </div>
     </div>
   );

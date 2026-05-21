@@ -8,6 +8,7 @@
 // ============================================================================
 
 import type { Card as CardType } from '@shared/types';
+import { asset } from '@utils/asset';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
 import styles from './Card.module.css';
@@ -90,13 +91,13 @@ export default function Card({
         whileHover={onClick ? { y: -6 } : undefined}
         whileTap={onClick ? { scale: 0.96 } : undefined}
       >
-        <img src="/images/back.png" alt="Card back" className={styles.fullImg} />
+        <img src={asset('/images/back.png')} alt="Card back" className={styles.fullImg} />
       </motion.button>
     );
   }
 
   const isUnit = card.type === 'unit';
-  const framePath = isUnit ? '/images/frame.png' : '/images/skill-frame.png';
+  const framePath = asset(isUnit ? '/images/frame.png' : '/images/skill-frame.png');
 
   return (
     <motion.button
@@ -112,7 +113,9 @@ export default function Card({
       whileTap={onClick ? { scale: 0.96 } : undefined}
     >
       {/* Capa 1: imagen de la unidad/skill */}
-      {card.image && <img src={`/${card.image}`} alt={card.name} className={styles.bgImg} />}
+      {card.image && (
+        <img src={asset(card.image)} alt={card.name} className={styles.bgImg} />
+      )}
       {/* Capa 2: frame decorativo */}
       <img src={framePath} alt="" aria-hidden="true" className={styles.frameImg} />
       {/* Capa 3: textos */}

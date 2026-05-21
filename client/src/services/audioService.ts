@@ -11,6 +11,7 @@
 // (o .ogg/.wav) y se carga automáticamente al primer play.
 // ============================================================================
 
+import { asset } from '@utils/asset';
 import { Howl } from 'howler';
 
 export type SoundId =
@@ -89,7 +90,7 @@ export function play(id: SoundId): void {
   // Primer uso → crear Howl
   const config = SOUNDS[id];
   const howl = new Howl({
-    src: [config.src],
+    src: [asset(config.src)],
     volume: (config.volume ?? 1) * masterVolume,
     preload: true,
     onloaderror: () => {
@@ -116,7 +117,7 @@ export function preload(ids: SoundId[]): void {
     if (howlCache.has(id)) continue;
     const config = SOUNDS[id];
     const howl = new Howl({
-      src: [config.src],
+      src: [asset(config.src)],
       preload: true,
       onloaderror: () => {
         howlCache.set(id, null);

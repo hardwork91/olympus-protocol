@@ -25,19 +25,19 @@ async function mutateGameState(
 ): Promise<SerializedGameState> {
   const stateRef = ref(db, `games/${roomId}/state`);
   const result = await runTransaction(stateRef, (current: SerializedGameState | null) => {
-    if (!current) return current;
+    if (!current) return; // no hay sala → abort (commit:false)
     const game = Game.fromSerialized(current);
     const success = mutate(game);
     if (!success) {
-      // Abort: el cliente intentó algo inválido (puede ser fuera de turno,
-      // slot ocupado, etc.). No escribimos.
-      return current;
+      // Validación falló: devolvemos undefined → la transacción NO commitea
+      // y el caller recibe un error claro de "rejected".
+      return;
     }
     return sanitizeForFirebase(game.serialize());
   });
 
   if (!result.committed) {
-    throw new Error(`${actionLabel}: transaction did not commit.`);
+    throw new Error(`${actionLabel}: rejected (invalid action or state).`);
   }
   const value = result.snapshot.val();
   if (!value) {

@@ -1,0 +1,29 @@
+.slot {
+  width: 144px;
+  height: 202px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.slot.empty .label {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.slot.highlighted {
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.slot.clickable {
+  cursor: pointer;
+}

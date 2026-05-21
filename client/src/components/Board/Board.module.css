@@ -1,0 +1,18 @@
+.app {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  height: 100vh;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-deep);
+  color: var(--text-light);
+  overflow: hidden;
+}
+
+.main {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 12px;
+  min-height: 0;
+  overflow: hidden;
+}

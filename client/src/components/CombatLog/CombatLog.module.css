@@ -1,0 +1,34 @@
+.log {
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid #3a4a6b;
+  border-radius: 6px;
+  padding: 8px 12px;
+  overflow-y: auto;
+  font-family: 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  flex: 1;
+  min-height: 100px;
+  color: var(--text-light);
+}
+
+.empty {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 11px;
+  padding: 8px 0;
+  text-align: center;
+}
+
+.entry {
+  margin: 3px 0;
+  word-wrap: break-word;
+}
+
+.turn {
+  color: var(--gold);
+  font-weight: bold;
+  margin-right: 6px;
+  display: inline-block;
+  min-width: 30px;
+}

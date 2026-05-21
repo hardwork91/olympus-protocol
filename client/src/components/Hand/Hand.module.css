@@ -1,0 +1,27 @@
+.hand {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  padding: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 4px;
+}
+
+.local {
+  /* Hand local — más prominente */
+}
+
+.opponent {
+  opacity: 0.85;
+}
+
+.placeholder {
+  width: 135px;
+  height: 189px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  flex-shrink: 0;
+}

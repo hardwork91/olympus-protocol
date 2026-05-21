@@ -1,15 +1,15 @@
 // ============================================================================
-// Game — vista de partida. En Fase 3 solo muestra:
-//   - Mensaje "Waiting for player 2..." si la sala tiene un seat libre.
-//   - Estado básico cuando ambos jugadores están dentro (placeholder).
-//
-// El UI real del tablero (cartas, slots, action bar) llega en Fase 4.
+// Game — vista de partida.
+// - Si la sala tiene seat 2 libre: muestra Waiting screen con code + Copy URL.
+// - Si ambos seats ocupados: monta el Board con todo el UI del juego.
 // ============================================================================
 
+import Board from '@components/Board/Board';
 import { useRoom } from '@hooks/useRoom';
 import { useUser } from '@hooks/useUser';
 import { buildRoomURL } from '@services/roomService';
-import { useState } from 'react';
+import { useUIStore } from '@store/uiStore';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import styles from './Game.module.css';
 
@@ -19,6 +19,15 @@ export default function Game() {
   const { userId } = useUser();
   const { room, seat, loading } = useRoom(roomId ?? null, userId);
   const [copied, setCopied] = useState(false);
+  const errorMessage = useUIStore((s) => s.errorMessage);
+  const setErrorMessage = useUIStore((s) => s.setErrorMessage);
+
+  // Auto-clear errores tras 4s
+  useEffect(() => {
+    if (!errorMessage) return;
+    const t = setTimeout(() => setErrorMessage(null), 4000);
+    return () => clearTimeout(t);
+  }, [errorMessage, setErrorMessage]);
 
   if (loading) return <div className={styles.page}>Loading room…</div>;
   if (!room) {
@@ -29,11 +38,18 @@ export default function Game() {
       </div>
     );
   }
+  if (!roomId || !seat) {
+    return (
+      <div className={styles.page}>
+        <p>You are not seated in this room.</p>
+        <button onClick={() => navigate('/')}>Back to menu</button>
+      </div>
+    );
+  }
 
   const isWaiting = !room.seats[1] || !room.seats[2];
 
   const handleCopyUrl = async (): Promise<void> => {
-    if (!roomId) return;
     const url = buildRoomURL(roomId);
     try {
       await navigator.clipboard.writeText(url);
@@ -58,25 +74,17 @@ export default function Game() {
           (Ctrl+Shift+N).
         </p>
         <p className={styles.seat}>
-          You are: <strong>Player {seat ?? '?'}</strong>
+          You are: <strong>Player {seat}</strong>
         </p>
         <button onClick={() => navigate('/')}>Exit to menu</button>
       </div>
     );
   }
 
-  // Ambos jugadores conectados — placeholder de Fase 4.
   return (
-    <div className={styles.page}>
-      <h1>Game in progress</h1>
-      <p className={styles.seat}>
-        Seat: <strong>Player {seat ?? '?'}</strong>
-      </p>
-      <p>Phase: {room.state.phase}</p>
-      <p>Active player: {room.state.activePlayer ?? '—'}</p>
-      <p>Turn: {room.state.turnNumber}</p>
-      <p style={{ marginTop: 24, color: 'var(--text-dim)' }}>UI del tablero llega en Fase 4.</p>
-      <button onClick={() => navigate('/')}>Exit to menu</button>
-    </div>
+    <>
+      <Board roomId={roomId} state={room.state} localSeat={seat} />
+      {errorMessage && <div className={styles.toast}>{errorMessage}</div>}
+    </>
   );
 }

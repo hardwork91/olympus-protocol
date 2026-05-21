@@ -140,25 +140,20 @@
   top: 67.5%;
 }
 
-/* ─── Estados de interacción ─────────────────────────────────────── */
-.card.inHand:hover:not(:disabled) {
-  transform: translateY(-6px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
-}
+/* ─── Estados de interacción ────────────────────────────────────────
+   El hover/tap lift y la animación de entrada/salida los maneja Framer.
+   Solo dejamos box-shadow / filter / opacity acá. */
 
-.card.notClickable:hover {
-  transform: none;
-  box-shadow: none;
+.card.notClickable {
+  pointer-events: none;
 }
 
 .card.selected {
   box-shadow: 0 0 14px var(--gold) !important;
-  transform: translateY(-6px);
 }
 
 .card.opponentSelected {
   box-shadow: 0 0 14px var(--gold) !important;
-  transform: translateY(6px);
 }
 
 .card.highlighted {

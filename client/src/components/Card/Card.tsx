@@ -1,14 +1,15 @@
 // ============================================================================
 // Card — renderiza una carta (unidad o skill).
-// Diseño estilo Yu-Gi-Oh con frame.png overlay:
-//   - Capa 1 (z=1): imagen de la unidad/skill como fondo (object-fit: cover)
+// Diseño estilo Yu-Gi-Oh con frame.png overlay + animaciones con Framer.
+//   - Capa 1 (z=1): imagen de la unidad/skill como fondo
 //   - Capa 2 (z=2): frame.png o skill-frame.png como overlay decorativo
-//   - Capa 3 (z=3): textos absolutamente posicionados (nombre, FP, AR, lore)
+//   - Capa 3 (z=3): textos absolutamente posicionados
 // El tamaño usa container-type: inline-size para que los textos escalen con cqi.
 // ============================================================================
 
 import type { Card as CardType } from '@shared/types';
 import clsx from 'clsx';
+import { motion } from 'framer-motion';
 import styles from './Card.module.css';
 
 interface CardProps {
@@ -16,12 +17,18 @@ interface CardProps {
   faceDown?: boolean;
   selected?: boolean;
   highlighted?: boolean;
-  /** Halo dorado tipo "selección del rival" — mismo color, animación distinta. */
   opponentSelected?: boolean;
   onClick?: () => void;
   variant?: 'inHand' | 'inSlot';
   skillState?: 'hidden' | 'active' | 'consumed';
 }
+
+const cardMotion = {
+  initial: { opacity: 0, y: -16, scale: 0.92 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, scale: 0.85, transition: { duration: 0.18 } },
+  transition: { type: 'spring', stiffness: 320, damping: 26 } as const,
+};
 
 export default function Card({
   card,
@@ -47,14 +54,21 @@ export default function Card({
 
   if (faceDown || !card) {
     return (
-      <button
+      <motion.button
         type="button"
         onClick={onClick}
         disabled={!onClick}
         className={clsx(className, styles.cardBack)}
+        layout
+        initial={cardMotion.initial}
+        animate={cardMotion.animate}
+        exit={cardMotion.exit}
+        transition={cardMotion.transition}
+        whileHover={onClick ? { y: -6 } : undefined}
+        whileTap={onClick ? { scale: 0.96 } : undefined}
       >
         <img src="/images/back.png" alt="Card back" className={styles.fullImg} />
-      </button>
+      </motion.button>
     );
   }
 
@@ -62,11 +76,18 @@ export default function Card({
   const framePath = isUnit ? '/images/frame.png' : '/images/skill-frame.png';
 
   return (
-    <button
+    <motion.button
       type="button"
       onClick={onClick}
       disabled={!onClick}
       className={clsx(className, isUnit ? styles.unit : styles.skill)}
+      layout
+      initial={cardMotion.initial}
+      animate={cardMotion.animate}
+      exit={cardMotion.exit}
+      transition={cardMotion.transition}
+      whileHover={onClick ? { y: -6 } : undefined}
+      whileTap={onClick ? { scale: 0.96 } : undefined}
     >
       {/* Capa 1: imagen de la unidad/skill */}
       {card.image && <img src={`/${card.image}`} alt={card.name} className={styles.bgImg} />}
@@ -83,6 +104,6 @@ export default function Card({
       ) : (
         <div className={clsx(styles.frameDesc, styles.skillDesc)}>{card.effect}</div>
       )}
-    </button>
+    </motion.button>
   );
 }

@@ -9,6 +9,7 @@ import { useRoom } from '@hooks/useRoom';
 import { useUser } from '@hooks/useUser';
 import { buildRoomURL } from '@services/roomService';
 import { useUIStore } from '@store/uiStore';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import styles from './Game.module.css';
@@ -84,7 +85,20 @@ export default function Game() {
   return (
     <>
       <Board roomId={roomId} state={room.state} localSeat={seat} />
-      {errorMessage && <div className={styles.toast}>{errorMessage}</div>}
+      <AnimatePresence>
+        {errorMessage && (
+          <motion.div
+            key="toast"
+            className={styles.toast}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24, transition: { duration: 0.18 } }}
+            transition={{ duration: 0.22 }}
+          >
+            {errorMessage}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </>
   );
 }

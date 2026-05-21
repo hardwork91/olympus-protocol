@@ -4,11 +4,13 @@
 // Cada botón llama a una función de gameService (server-authoritative).
 // ============================================================================
 
+import { useSound } from '@hooks/useSound';
 import { Game } from '@server/gameEngine';
 import * as gameService from '@services/gameService';
 import type { PlayerId, SerializedGameState } from '@shared/types';
 import { useUIStore } from '@store/uiStore';
 import clsx from 'clsx';
+import { useEffect } from 'react';
 import styles from './ActionBar.module.css';
 
 interface ActionBarProps {
@@ -24,12 +26,23 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
   const isAnimating = useUIStore((s) => s.isAnimating);
   const setIsAnimating = useUIStore((s) => s.setIsAnimating);
   const setSelectedInstanceId = useUIStore((s) => s.setSelectedInstanceId);
+  const playSound = useSound();
+
+  // SFX al cambiar a phase=over (una sola vez por victoria/derrota).
+  useEffect(() => {
+    if (state.phase === 'over' && state.gameOver) {
+      const winner = state.gameOver.winner;
+      if (winner === localSeat) playSound('victory');
+      else if (winner !== null) playSound('defeat');
+    }
+  }, [state.phase, state.gameOver, localSeat, playSound]);
 
   const run = async (fn: () => Promise<unknown>): Promise<void> => {
     try {
       await fn();
     } catch (e: unknown) {
       setErrorMessage(e instanceof Error ? e.message : String(e));
+      playSound('error');
     }
   };
 
@@ -155,6 +168,7 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
             onClick={async () => {
               setIsAnimating(true);
               setSelectedInstanceId(null);
+              playSound('turnEnd');
               await run(() => gameService.endTurn(roomId, localSeat));
               setIsAnimating(false);
             }}

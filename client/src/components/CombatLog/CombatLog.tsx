@@ -1,9 +1,10 @@
 // ============================================================================
-// CombatLog — render del log de combate. Hace auto-scroll al final cuando
-// llegan entradas nuevas.
+// CombatLog — render del log de combate con auto-scroll y fade-in de
+// entradas nuevas (Framer Motion).
 // ============================================================================
 
 import type { LogEntry } from '@shared/types';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef } from 'react';
 import styles from './CombatLog.module.css';
 
@@ -24,12 +25,20 @@ export default function CombatLog({ entries }: CombatLogProps) {
       {entries.length === 0 ? (
         <div className={styles.empty}>Combat log will appear here.</div>
       ) : (
-        entries.map((entry, i) => (
-          <div key={i} className={styles.entry}>
-            <span className={styles.turn}>T{entry.turn}</span>
-            {entry.message}
-          </div>
-        ))
+        <AnimatePresence initial={false}>
+          {entries.map((entry, i) => (
+            <motion.div
+              key={i}
+              className={styles.entry}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.18 }}
+            >
+              <span className={styles.turn}>T{entry.turn}</span>
+              {entry.message}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       )}
     </div>
   );

@@ -11,6 +11,7 @@
 
 import PlayerArea from '@components/PlayerArea/PlayerArea';
 import Sidebar from '@components/Sidebar/Sidebar';
+import { useSound } from '@hooks/useSound';
 import { Game } from '@server/gameEngine';
 import * as gameService from '@services/gameService';
 import type { PlayerId, SerializedGameState, SlotIndicator } from '@shared/types';
@@ -29,6 +30,7 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
   const selectedInstanceId = useUIStore((s) => s.selectedInstanceId);
   const setSelectedInstanceId = useUIStore((s) => s.setSelectedInstanceId);
   const setErrorMessage = useUIStore((s) => s.setErrorMessage);
+  const playSound = useSound();
 
   const opponentSeat: PlayerId = otherPlayer(localSeat);
 
@@ -51,6 +53,7 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
     // Toggle: si ya estaba seleccionada, deseleccionar.
     const newSelection = selectedInstanceId === instanceId ? null : instanceId;
     setSelectedInstanceId(newSelection);
+    playSound(newSelection ? 'cardSelect' : 'cardClick');
 
     // Broadcast solo cuando es mi turno (server-authoritative; en otros
     // momentos la selección queda local para feedback visual personal).
@@ -71,9 +74,13 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
     if (canBroadcastSelection) {
       gameService.setSelection(roomId, localSeat, null).catch(() => {});
     }
-    gameService.placeCard(roomId, localSeat, instanceId, slot).catch((err: unknown) => {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
-    });
+    gameService
+      .placeCard(roomId, localSeat, instanceId, slot)
+      .then(() => playSound('cardPlace'))
+      .catch((err: unknown) => {
+        setErrorMessage(err instanceof Error ? err.message : String(err));
+        playSound('error');
+      });
   };
 
   // ¿Es turno del rival? Si sí, mostrar su halo de selección.

@@ -27,14 +27,82 @@
   --subtype-offensive: #d65a5a;
   --subtype-defensive: #5a6bd6;
   --subtype-trap: #9a3aca;
+
+  /* Cursores custom (32×32 cada uno, hotspot punta arriba-izquierda).
+     Para usar: cursor: var(--cursor-arrow), auto;  o
+                cursor: var(--cursor-pointer), pointer; */
+  --cursor-arrow: url('images/cursor-arrow.png?v=43') 2 2;
+  --cursor-pointer: url('images/cursor-pointer.png?v=43') 2 2;
 }
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
+
+/* ─── Cursor custom ─────────────────────────────────────────────
+   Default arrow custom (32×32). Los elementos con cursor:pointer/default
+   por su cuenta también usan las variables custom. */
+html, body {
+  cursor: var(--cursor-arrow), auto;
+}
+
+/* ─── Scrollbar global ─────────────────────────────────────────────
+   - Track: línea dorada fina centrada (vertical u horizontal según orientación).
+   - Thumb: imagen scroll.png centrada, tamaño fijo (no se estira con el thumb).
+   - Sin botones de flecha.
+   Firefox usa scrollbar-width / scrollbar-color (menos personalizable). */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* Línea dorada vertical en el centro del track vertical */
+::-webkit-scrollbar-track:vertical {
+  background: linear-gradient(
+    to right,
+    transparent calc(50% - 1px),
+    var(--gold) calc(50% - 1px),
+    var(--gold) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+/* Línea dorada horizontal en el centro del track horizontal */
+::-webkit-scrollbar-track:horizontal {
+  background: linear-gradient(
+    to bottom,
+    transparent calc(50% - 1px),
+    var(--gold) calc(50% - 1px),
+    var(--gold) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+::-webkit-scrollbar-thumb {
+  /* Imagen scroll.png centrada, ancho 14px (alto auto preserva aspecto).
+     Sin background-color → la línea dorada del track se ve detrás cuando
+     hay zona transparente en el PNG. */
+  background: url('images/scroll.png?v=43') center / 14px auto no-repeat;
+  border: none;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b16c00 transparent;
+}
 body {
   margin: 0;
-  font-family: 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg-deep);
+  /* Cormorant Garamond es la fuente secundaria (cuerpo de texto, descripciones,
+     stats). Cinzel se aplica por reglas específicas a títulos/labels/nombres. */
+  font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+  background: url('images/marble.png?v=43') center/cover no-repeat fixed,
+              #0a0e1a;
   color: var(--text-light);
   font-size: 13px;
   overflow: hidden;
@@ -42,6 +110,7 @@ body {
 
 /* ─── Layout principal: 2 columnas (board + sidebar) ─── */
 .app {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 340px;
   height: 100vh;
@@ -50,13 +119,96 @@ body {
   overflow: hidden;
 }
 
+/* Decoración del sidebar: imagen flotante (sider-header) que va POR ENCIMA
+   del sidebar, NO dentro de él. Sigue el mismo patrón que el attack-icon:
+   absolute, sin pointer-events, posicionada en la columna del sidebar. */
+.sidebar-deco {
+  position: absolute;
+  top: 8px;
+  right: 12px;          /* alinea con el padding derecho de .app */
+  width: 340px;          /* mismo ancho que la columna del sidebar */
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+.sidebar-deco img {
+  width: 352px;
+  height: auto;
+  display: block;
+}
+
 /* ─── Main area: 2 filas (P2 arriba / P1 abajo) ─── */
 .main-area {
+  position: relative;
   display: grid;
   grid-template-rows: 1fr 1fr;
-  gap: 12px;
+  gap: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+/* ─── Icono flotante de combate (centro del tablero) ───
+   Posicionado absolutamente en el centro de .main-area.
+   No bloquea clicks ni interfiere con el layout. */
+.main-area-attack-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  /* z-index: 1 — necesario para que pinte encima de los .player. Con seat 1
+     el orden de documento bastaba, pero con seat 2 los .player reciben
+     order:1 y order:2 (para invertir el layout), lo que cambia el paint
+     order y dejaba el icono detrás. z=1 lo pone arriba de los paneles
+     (z-auto) sin acercarse a los modales (z=100). */
+  z-index: 1;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.main-area-attack-icon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ─── Fly ornaments (decoración lateral del tablero) ───
+   Dos copias: una al borde derecho (orientación natural) y otra al borde
+   izquierdo (espejada con scaleX(-1)). Mismo tratamiento que el attack-icon:
+   absolutos, no interactivos, sin z-index (pintan encima por orden de
+   documento al ser hijos finales del .main-area). */
+.main-area-fly {
+  position: absolute;
+  top: 50%;
+  pointer-events: none;
+  /* Mismo motivo que .main-area-attack-icon: z-index 1 para sobrevivir al
+     order:1/2 que reciben los .player cuando localSeat=2. */
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.main-area-fly img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.main-area-fly-right {
+  right: -13px;
+  transform: translateY(-50%);
+}
+.main-area-fly-left {
+  left: -13px;
+  /* La orientación natural es "hacia la derecha" — la copia izquierda se
+     espeja horizontalmente con scaleX(-1). El translate -50% mantiene
+     el centrado vertical compuesto con el espejo. */
+  transform: translateY(-50%) scaleX(-1);
 }
 
 /* ─── Sidebar: header + log + action bar ─── */
@@ -64,17 +216,28 @@ body {
   display: grid;
   grid-template-rows: auto 1fr auto;
   gap: 12px;
-  background: var(--bg-board);
-  border: 2px solid var(--bg-panel);
+  background: rgba(0, 0, 0, 0.35);
+  border: none;
   border-radius: 8px;
-  padding: 12px;
+  padding: 0;
   min-height: 0;
   overflow: hidden;
 }
 
+/* Offset vertical para dejar espacio a la imagen decorativa que se sobrepone
+   en la parte superior. Le sumamos padding-top para que el contenido interno
+   tampoco choque con la decoración, y restamos esos 50px a la altura para
+   que el sidebar no se salga por abajo. */
+.sidebar.fancy-border {
+  top: 50px;
+  padding-top: 50px;
+  height: calc(100% - 50px);
+}
+
+
 .sidebar-header {
-  background: var(--bg-panel);
-  border: 1px solid var(--unit-frame);
+  background: rgba(0, 0, 0, 0.35);
+  border: none;
   border-radius: 6px;
   padding: 12px;
   text-align: center;
@@ -82,42 +245,44 @@ body {
 .sidebar-header h1 {
   margin: 0;
   color: var(--gold);
-  font-size: 15px;
+  font-size: 22px;
   letter-spacing: 0.08em;
 }
 .sidebar-subtitle {
   color: var(--text-dim);
-  font-size: 10px;
+  font-size: 16px;
   margin: 4px 0 10px;
 }
-.sidebar-header button {
+/* Botones genéricos del sidebar-header — excluimos los .fancy-button
+   para que las decoraciones por sprites no se sobreescriban. */
+.sidebar-header button:not(.fancy-button) {
   background: var(--bg-deep);
   color: var(--text-light);
   border: 1px solid var(--unit-frame);
   padding: 6px 14px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   border-radius: 4px;
   font-size: 12px;
 }
-.sidebar-header button:hover { background: var(--unit-frame); }
+.sidebar-header button:not(.fancy-button):hover { background: var(--unit-frame); }
 
 /* ─── Áreas de jugador (2 columnas: slots-grid (incluye info) + hand) ─── */
 .player {
+  position: relative;
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 12px;
-  background: var(--bg-board);
-  border: 2px solid var(--bg-panel);
+  background: transparent;
+  border: none;
   border-radius: 8px;
-  padding: 10px;
+  padding: 0px;
   transition: border-color 0.3s;
   min-height: 0;
   overflow: hidden;
 }
-.player.active {
-  border-color: var(--gold);
-  box-shadow: 0 0 16px rgba(251, 191, 36, 0.3);
-}
+
+/* Imágenes city/underworld removidas por ahora. */
+/* .player.active styling removido — sin highlight de borde por ahora */
 .player.setup-current {
   border-color: var(--green);
   box-shadow: 0 0 12px rgba(74, 222, 128, 0.3);
@@ -130,15 +295,14 @@ body {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: url('images/info.png?v=27') center/cover no-repeat,
-              linear-gradient(180deg, #1a2238 0%, #0a0e1a 100%);
+  background: url('images/info.png?v=43') center/cover no-repeat;
   border: none;
   border-radius: 0.5cqi;
   padding: 8px 15px 10px;
   overflow: hidden;
   container-type: inline-size;
-  font-family: 'Times New Roman', 'Georgia', serif;
-  font-weight: bolder;
+  font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+  font-weight: 700;
 }
 .player-name {
   font-family: 'Asimovian', 'Times New Roman', serif;
@@ -214,10 +378,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: default;
+  cursor: var(--cursor-arrow), default;
   transition: all 0.2s;
   container-type: inline-size;
   overflow: hidden;
+}
+.slot.empty {
+  opacity: 80%;
 }
 .slot.empty .slot-label {
   color: var(--text-dim);
@@ -236,13 +403,13 @@ body {
 .slot.highlight {
   border: 2px solid var(--gold);
   box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   background: rgba(251, 191, 36, 0.1);
 }
 .slot.highlight-replace {
   border: 2px dashed var(--amber);
   box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }
 .slot.skill-active { box-shadow: 0 0 12px rgba(74, 222, 128, 0.5); }
 .slot.skill-hidden { box-shadow: 0 0 10px rgba(192, 132, 252, 0.4); }
@@ -316,8 +483,8 @@ body {
   position: absolute;
   z-index: 3;
   color: #c2b9aa;
-  font-weight: bold;
-  font-family: 'Times New Roman', 'Georgia', serif;
+  font-weight: 700;
+  font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
   line-height: 1;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9),
                0 0 3px rgba(0, 0, 0, 0.8);
@@ -328,11 +495,13 @@ body {
 .frame-name {
   left: 11%;
   right: 11%;
-  top: 3.1%;
-  font-size: 9.5cqi;
+  top: 4.2%;
+  font-size: 8cqi;
   letter-spacing: 0.04em;
   text-align: center;
-  font-family: 'Asimovian', 'Times New Roman', serif;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-weight: 700;
+  color: #fbbf24;
 }
 
 .frame-fp {
@@ -349,6 +518,14 @@ body {
   transform: translate(-50%, -50%);
 }
 
+/* FP y Armor mantienen la tipografía original (serif clásica) en lugar
+   de la fuente secundaria Cormorant Garamond — para legibilidad numérica. */
+.frame-fp,
+.frame-ar {
+  font-family: 'Times New Roman', 'Georgia', serif;
+  font-weight: bold;
+}
+
 /* Descripción / lore en el pergamino inferior. Texto en bold marrón oscuro,
    formato párrafo que envuelve. */
 .frame-desc {
@@ -360,8 +537,8 @@ body {
   top: 76.9%;
   font-size: 6cqi;
   color: #321200;
-  font-family: 'Times New Roman', 'Georgia', serif;
-  font-weight: bold;
+  font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+  font-weight: 700;
   line-height: 1;
   text-align: center;
   white-space: normal;
@@ -501,7 +678,7 @@ body {
 }
 
 /* ─── Carta seleccionada y en mano ─── */
-.card.in-hand { cursor: pointer; }
+.card.in-hand { cursor: var(--cursor-pointer), pointer; }
 .card.in-hand:hover {
   transform: translateY(-6px);
   box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
@@ -517,13 +694,23 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px;
-  background: rgba(0, 0, 0, 0.2);
+  padding: 0;
+  background: transparent;
   border-radius: 4px;
   align-content: flex-start;
   min-height: 0;
   overflow-y: auto;
 }
+
+/* Vista por defecto (localSeat=1): p2 arriba, p1 abajo.
+   El hand de cada uno "se pega" hacia su lado del viewer. */
+#p1-hand { padding-top: 16px; }
+#p2-hand { padding-bottom: 16px; }
+
+/* Cuando localSeat=2 los paneles se invierten: p2 abajo, p1 arriba.
+   Invertimos también el padding de cada hand. */
+.app[data-local-seat="2"] #p1-hand { padding-top: 0; padding-bottom: 16px; }
+.app[data-local-seat="2"] #p2-hand { padding-bottom: 0; padding-top: 16px; }
 
 /* ─── Combat log ─── */
 .combat-log {
@@ -532,8 +719,8 @@ body {
   border-radius: 6px;
   padding: 8px 12px;
   overflow-y: auto;
-  font-family: 'Consolas', monospace;
-  font-size: 11px;
+  font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+  font-size: 14px;
   line-height: 1.4;
   min-height: 0;
 }
@@ -549,8 +736,8 @@ body {
 
 /* ─── Action bar ─── */
 .action-bar {
-  background: var(--bg-panel);
-  border: 1px solid var(--unit-frame);
+  background: rgba(0, 0, 0, 0.35);
+  border: none;
   border-radius: 6px;
   padding: 10px;
   display: flex;
@@ -564,7 +751,7 @@ body {
   flex-basis: 100%;
   color: var(--gold);
   font-weight: bold;
-  font-size: 12px;
+  font-size: 14px;
   padding-bottom: 4px;
   border-bottom: 1px solid var(--bg-deep);
   margin-bottom: 4px;
@@ -572,7 +759,7 @@ body {
 .action-warn {
   flex-basis: 100%;
   color: var(--red);
-  font-size: 11px;
+  font-size: 14px;
   padding: 4px 0;
 }
 
@@ -581,7 +768,7 @@ body {
   color: var(--text-light);
   border: 1px solid var(--unit-frame);
   padding: 6px 10px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   border-radius: 4px;
   font-size: 11px;
   font-weight: bold;
@@ -603,7 +790,9 @@ body {
 .modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -611,51 +800,242 @@ body {
 }
 .modal.hidden { display: none; }
 .modal-content {
-  background: var(--bg-board);
-  border: 2px solid var(--gold);
-  border-radius: 8px;
-  padding: 32px;
+  background: url('images/marble.png?v=43') center/cover no-repeat;
+  border: none;
+  border-radius: 48px;
   min-width: 360px;
   max-width: 500px;
 }
+
+/* Decoración: header (cresta/yelmo) sobrepuesto en el borde superior del
+   modal, horizontalmente centrado. Usa ::before para no chocar con el
+   ::after del fancy-border (sprite-frame z-index:10). z-index:20 lo pone
+   por encima del marco. La imagen es 948×364 → mantengo aspect-ratio. */
+.modal-content.fancy-border::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -32px;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  aspect-ratio: 948 / 364;
+  background: url('images/header.png?v=43') center/contain no-repeat;
+  z-index: 20;
+  pointer-events: none;
+}
+/* Override del padding de .fancy-border (24px) para los modales — necesitan
+   más aire entre el marco-sprite y el contenido. */
+.modal .modal-content.fancy-border {
+  padding: 48px;
+}
 .modal-content h2 {
-  margin: 0 0 20px;
+  margin: -12px 0 12px;
   color: var(--gold);
   text-align: center;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-weight: 700;
 }
 .modal-content label {
   display: block;
-  margin: 12px 0;
+  margin: 12px 0 24px;
   color: var(--text-light);
+  font-size: 14px;
 }
-.modal-content input[type="number"] {
+.modal-content p {
+  font-size: 14px;
+}
+.modal-content input[type="number"],
+.modal-content input[type="text"] {
   width: 80px;
   padding: 4px 6px;
   background: var(--bg-deep);
   color: var(--text-light);
   border: 1px solid var(--unit-frame);
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 14px;
   margin-left: 8px;
 }
 .modal-content input[type="checkbox"] { margin-right: 6px; }
-.modal-content button {
+/* Botones genéricos legacy en modales — excluimos .fancy-button para que
+   los nuevos botones con sprites no se sobreescriban. */
+.modal-content button:not(.fancy-button) {
   background: var(--gold);
   color: var(--bg-deep);
   border: none;
   padding: 10px 24px;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   border-radius: 4px;
   font-size: 14px;
   font-weight: bold;
   display: block;
   margin: 24px auto 0;
 }
-.modal-content button:hover { background: var(--gold-bright); }
+.modal-content button:not(.fancy-button):hover { background: var(--gold-bright); }
+/* Botones .fancy-button dentro de modales: variante secundaria (compacta),
+   centrados, con margen vertical entre ellos.
+   display:flex + width:max-content para que margin:auto centre correctamente. */
+.modal-content .fancy-button {
+  --cap-w: 32px;
+  min-height: 32px;
+  padding: 2px calc(var(--cap-w) + 8px);
+  font-size: 14px;
+  display: flex;
+  width: max-content;
+  margin: 12px auto 0;
+}
+
+/* Contenedor de pares de botones (Join+Cancel, Create+Cancel, etc.):
+   los pone uno al lado del otro y los hace del mismo tamaño con flex:1. */
+.modal-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+.modal-buttons .fancy-button {
+  flex: 1;
+  width: auto;
+  margin: 0;
+  justify-content: center;
+}
 #endgame-stats { color: var(--text-light); margin: 16px 0; }
 #endgame-stats p { margin: 6px 0; }
 
 .hidden { display: none !important; }
+
+/* ─── Utility: fancy-border ────────────────────────────────────────
+   Aplica un marco compuesto por la textura corner.png (esquinas, auto-rotadas
+   por JS) + border.png (lados tileados). Generado en runtime por setupFancyBorder().
+   El marco se dibuja en un pseudo-elemento ::after absoluto que OVERLAY el
+   elemento (mismo tamaño), usando border-image. El borde dibuja sobre el
+   elemento (en sus 42px exteriores) por lo que técnicamente "ocupa" 42px de
+   la apariencia visual, pero NO altera el layout del contenido — los hijos
+   del .fancy-border siguen usando todo el espacio. Si quieres que el contenido
+   no quede tapado por el marco, asegúrate de tener un padding apropiado. */
+.fancy-border {
+  position: relative;
+  padding: 24px;
+  /* Aísla el stacking context: los z-index internos (frame=2, nombres=3,
+     ::after del borde=10) quedan contenidos dentro de este elemento y no
+     "escapan" al body. Así un sibling sin z-index (como .main-area-attack-icon)
+     puede pintar encima por orden de documento, sin necesitar z-index propio. */
+  isolation: isolate;
+}
+.fancy-border::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: var(--fancy-border-size, 42px) solid transparent;
+  border-image-source: var(--fancy-border-image);
+  border-image-slice: 42;
+  border-image-width: var(--fancy-border-size, 42px);
+  border-image-outset: 0;
+  border-image-repeat: round;
+  pointer-events: none;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+/* ─── Utility: fancy-label ─────────────────────────────────────────
+   Etiqueta decorativa compuesta por 3 sprites:
+   - label-start.png: cap izquierdo (ancla a la izquierda, altura completa,
+     mantiene aspect ratio)
+   - label-end.png: cap derecho (idem, derecha)
+   - label-center.png: panel central estirado a 100% ancho × 100% alto
+   El padding-horizontal reserva espacio para que el texto no quede sobre
+   los caps decorativos. Texto en dorado simulando placa metálica. */
+.fancy-label {
+  /* Los sprites label-*.png son 286×286 (caps, ratio 1:1) y 1375×286 (center).
+     Con caps 1:1 escalados a 100% altura, el ancho renderizado del cap
+     equivale a la altura del contenedor → --cap-w = min-height. */
+  --cap-w: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 2px calc(var(--cap-w) + 10px);
+  background:
+    url('images/label-start.png?v=43') left center / auto 100% no-repeat,
+    url('images/label-end.png?v=43') right center / auto 100% no-repeat,
+    url('images/label-center.png?v=43') calc(var(--cap-w) - 1px) center / calc(100% - 2 * var(--cap-w) + 2px) 100% no-repeat;
+  /* El center se solapa 1px dentro de cada cap para evitar líneas
+     transparentes durante el sub-pixel scaling de transform: scale. */
+}
+.fancy-label-text {
+  color: #fbbf24;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-size: 14px;
+  font-weight: normal;
+  letter-spacing: 0.12em;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9),
+               0 0 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+/* Cuando el texto del label está vacío (sin room code todavía), ocultamos
+   todo el contenedor para que no se vea la placa vacía. */
+.fancy-label:has(.fancy-label-text:empty) { display: none; }
+
+/* ─── Utility: fancy-button ────────────────────────────────────────
+   Botón decorativo. Misma técnica de 3 sprites que .fancy-label pero con
+   button-*.png. Texto en color/fuente de las unidades (#c2b9aa, Asimovian).
+   - hover: brillo dorado externo (drop-shadow sigue la transparencia PNG,
+     dando un halo que respeta la forma de los caps).
+   - active: leve encogido (scale 0.94). */
+.fancy-button {
+  /* Caps 357×357 (1:1) y center 1232×357. --cap-w = min-height. */
+  --cap-w: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 4px calc(var(--cap-w) + 14px);
+  background:
+    url('images/button-start.png?v=43') left center / auto 100% no-repeat,
+    url('images/button-end.png?v=43') right center / auto 100% no-repeat,
+    url('images/button-center.png?v=43') calc(var(--cap-w) - 1px) center / calc(100% - 2 * var(--cap-w) + 2px) 100% no-repeat;
+  border: none;
+  cursor: var(--cursor-pointer), pointer;
+  appearance: none;
+  color: #fbbf24;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9),
+               0 0 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  transition: filter 0.15s ease, transform 0.08s ease;
+}
+.fancy-button:hover {
+  filter: drop-shadow(0 0 5px var(--gold));
+}
+.fancy-button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.fancy-button:disabled {
+  filter: grayscale(0.6) brightness(0.7);
+  cursor: not-allowed;
+}
+
+/* Sidebar layout helper: el .fancy-label y .fancy-button son inline-flex
+   por defecto. Dentro del sidebar-header los forzamos a block (display:flex)
+   con ancho según contenido, centrados, y con margen vertical. */
+.sidebar-header > .fancy-label,
+.sidebar-header > .fancy-button {
+  display: flex;
+  width: max-content;
+  margin: 8px auto;
+}
+
+/* Botones secundarios dentro del action-bar: mismo estilo sprite pero más
+   compactos (caps 1:1 → --cap-w = min-height). */
+.action-bar .fancy-button {
+  --cap-w: 32px;
+  min-height: 32px;
+  padding: 2px calc(var(--cap-w) + 8px);
+  font-size: 14px;
+}
 
 /* ─── Botones modal: primario / secundario ─── */
 .modal-btn-primary,
@@ -668,7 +1048,7 @@ body {
   border-radius: 4px;
   font-size: 14px;
   font-weight: bold;
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
   transition: all 0.15s;
 }
 .modal-btn-primary {
@@ -707,7 +1087,7 @@ body {
 /* ─── Mensaje de error en modales ─── */
 .error-msg {
   color: var(--red);
-  font-size: 12px;
+  font-size: 14px;
   padding: 8px 0;
   text-align: center;
 }
@@ -722,14 +1102,51 @@ body {
   margin: 6px 0 10px;
 }
 
+/* ─── Slot vacío de mano: representa un hueco aún no robado del mazo.
+       No clickeable, sin hover, opacidad reducida. ─── */
+.card.hand-empty,
+.card.hand-empty:hover {
+  width: 190px;
+  height: 266px;
+  background: transparent;
+  border: none;
+  border-radius: 0.5cqi;
+  display: block;
+  position: relative;
+  overflow: hidden;
+  padding: 0;
+  pointer-events: none;
+  cursor: var(--cursor-arrow), default;
+  transform: none;
+  box-shadow: none;
+  opacity: 0.55;
+  flex-shrink: 0;
+}
+.hand-empty-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* ─── Carta no clicable (mano del rival) ─── */
 .card.in-hand.not-clickable {
-  cursor: default;
+  cursor: var(--cursor-arrow), default;
   opacity: 0.85;
 }
 .card.in-hand.not-clickable:hover {
   transform: none;
   box-shadow: none;
+}
+
+/* Carta seleccionada por el rival: halo dorado, sin animación de hover,
+   y movimiento HACIA ABAJO (al revés que mi propia .selected). */
+.card.opponent-selected,
+.card.in-hand.not-clickable.opponent-selected,
+.card.in-hand.not-clickable.opponent-selected:hover {
+  box-shadow: 0 0 14px var(--gold);
+  transform: translateY(6px);
+  cursor: var(--cursor-arrow), default;
 }
 
 /* ─── Dorso de carta (mano y skills bocaabajo del rival) ─── */

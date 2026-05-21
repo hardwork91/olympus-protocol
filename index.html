@@ -9,23 +9,25 @@
   <title>Olympus Protocol — Simulator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Asimovian&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Asimovian&family=Cinzel:wght@400;500;600;700;800;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500;1,600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css?v=43" />
 </head>
 <body>
   <!-- Main menu modal: Create or Join -->
   <div id="main-menu-modal" class="modal hidden">
-    <div class="modal-content">
+    <div class="modal-content fancy-border">
       <h2>OLYMPUS PROTOCOL</h2>
       <p style="text-align:center;color:var(--text-dim);margin-bottom:24px;">1v1 Online Simulator · Phase 0</p>
-      <button id="btn-create" class="modal-btn-primary">Create new game</button>
-      <button id="btn-join" class="modal-btn-secondary">Join with code</button>
+      <div class="modal-buttons">
+        <button id="btn-create" class="fancy-button">Create new game</button>
+        <button id="btn-join" class="fancy-button">Join with code</button>
+      </div>
     </div>
   </div>
 
   <!-- Create game modal -->
   <div id="create-modal" class="modal hidden">
-    <div class="modal-content">
+    <div class="modal-content fancy-border">
       <h2>Create game</h2>
       <label>
         Starting life (10-50):
@@ -35,32 +37,36 @@
         Max turns (10-40):
         <input id="config-turnos" type="number" min="10" max="40" value="20" />
       </label>
-      <button id="btn-create-confirm" class="modal-btn-primary">Create game</button>
-      <button id="btn-create-cancel" class="modal-btn-secondary">Cancel</button>
+      <div class="modal-buttons">
+        <button id="btn-create-confirm" class="fancy-button">Create game</button>
+        <button id="btn-create-cancel" class="fancy-button">Cancel</button>
+      </div>
     </div>
   </div>
 
   <!-- Join game modal -->
   <div id="join-modal" class="modal hidden">
-    <div class="modal-content">
+    <div class="modal-content fancy-border">
       <h2>Join game</h2>
       <label>
         Room code (6 characters):
         <input id="join-code" type="text" maxlength="6" autocomplete="off" placeholder="ABC123" style="text-transform: uppercase; letter-spacing: 0.1em;" />
       </label>
       <div id="join-error" class="error-msg hidden"></div>
-      <button id="btn-join-confirm" class="modal-btn-primary">Join</button>
-      <button id="btn-join-cancel" class="modal-btn-secondary">Cancel</button>
+      <div class="modal-buttons">
+        <button id="btn-join-confirm" class="fancy-button">Join</button>
+        <button id="btn-join-cancel" class="fancy-button">Cancel</button>
+      </div>
     </div>
   </div>
 
   <!-- Waiting modal (P1 waiting for P2) -->
   <div id="waiting-modal" class="modal hidden">
-    <div class="modal-content">
+    <div class="modal-content fancy-border">
       <h2>Waiting for player 2...</h2>
       <p style="text-align:center;color:var(--text-dim);">Share this code:</p>
       <div class="code-display" id="waiting-code">XXXXXX</div>
-      <button id="btn-copy-url" class="modal-btn-primary">Copy URL</button>
+      <button id="btn-copy-url" class="fancy-button">Copy URL</button>
       <p style="text-align:center;color:var(--text-dim);font-size:11px;margin-top:16px;">
         Your opponent must open this URL or enter the code in "Join with code".<br>
         <strong>For testing in the same browser:</strong> open the URL in an incognito window (Ctrl+Shift+N).
@@ -70,10 +76,10 @@
 
   <!-- Game over modal -->
   <div id="endgame-modal" class="modal hidden">
-    <div class="modal-content">
+    <div class="modal-content fancy-border">
       <h2 id="endgame-title">Game over</h2>
       <div id="endgame-stats"></div>
-      <button id="endgame-new" class="modal-btn-primary">New game</button>
+      <button id="endgame-new" class="fancy-button">New game</button>
     </div>
   </div>
 
@@ -82,7 +88,7 @@
     <!-- Main area: board (player 2 on top, player 1 on bottom) -->
     <main class="main-area">
       <!-- Player 2 (top) -->
-      <section class="player p2" id="player-2">
+      <section class="player p2 fancy-border" id="player-2">
         <div class="slots-grid">
           <div class="slot" data-player="2" data-slot="rearGuard"></div>
           <div class="player-info" id="p2-display">
@@ -100,7 +106,7 @@
       </section>
 
       <!-- Player 1 (bottom) -->
-      <section class="player p1" id="player-1">
+      <section class="player p1 fancy-border" id="player-1">
         <div class="slots-grid">
           <div class="slot" data-player="1" data-slot="frontLine"></div>
           <div class="slot" data-player="1" data-slot="skill"></div>
@@ -116,23 +122,48 @@
         </div>
         <div class="hand" id="p1-hand"></div>
       </section>
+
+      <!-- Floating attack icon (centro del tablero, no interactivo).
+           Va como ÚLTIMO hijo del .main-area para pintar encima de los .player
+           por orden de documento (sin necesidad de z-index). -->
+      <div class="main-area-attack-icon" aria-hidden="true">
+        <img src="images/attack-icon.png?v=43" alt="" />
+      </div>
+      <!-- Fly ornament (decorativo). Dos copias: una a la derecha en su
+           orientación natural, otra a la izquierda espejada (scaleX(-1)). -->
+      <div class="main-area-fly main-area-fly-right" aria-hidden="true">
+        <img src="images/fly.png?v=43" alt="" />
+      </div>
+      <div class="main-area-fly main-area-fly-left" aria-hidden="true">
+        <img src="images/fly.png?v=43" alt="" />
+      </div>
     </main>
 
     <!-- Sidebar: header + log + action bar -->
-    <aside class="sidebar">
+    <aside class="sidebar fancy-border">
       <header class="sidebar-header">
         <h1>OLYMPUS PROTOCOL</h1>
-        <div class="sidebar-subtitle">1v1 Online Simulator · <span id="sidebar-seat-label">—</span></div>
-        <div class="sidebar-room-code" id="sidebar-room-code"></div>
-        <button id="menu-restart">Exit to menu</button>
+        <div class="sidebar-subtitle"><span id="sidebar-seat-label">—</span></div>
+        <div class="fancy-label">
+          <span class="fancy-label-text" id="sidebar-room-code"></span>
+        </div>
+        <button class="fancy-button" id="menu-restart">Exit to menu</button>
       </header>
 
       <div class="combat-log" id="combat-log"></div>
 
       <div class="action-bar" id="action-bar"></div>
     </aside>
+
+    <!-- Decoración flotante del sidebar (cresta de yelmos + escudo).
+         Va DESPUÉS del .sidebar para pintar encima por orden de documento.
+         Es child de .app (no del .sidebar) para no ser recortado por el
+         overflow:hidden del sidebar. -->
+    <div class="sidebar-deco" aria-hidden="true">
+      <img src="images/sider-header.png?v=43" alt="" />
+    </div>
   </div>
 
-  <script type="module" src="ui.js"></script>
+  <script type="module" src="ui.js?v=43"></script>
 </body>
 </html>

@@ -22,7 +22,68 @@ import {
 
 // Cache-busting: bump esta cadena cuando se actualicen imágenes para
 // forzar al navegador a redescargarlas en vez de servirlas de caché.
-const ASSET_VERSION = '28';
+const ASSET_VERSION = '43';
+
+// ──────────────────────────────────────────────────────────────────
+// Fancy border: genera un sprite 9-slice combinando corner.png + border.png
+// con rotaciones (TL/TR/BR/BL para esquinas, top/right/bottom/left para edges).
+// Se expone como var CSS --fancy-border-image para usar con border-image.
+// ──────────────────────────────────────────────────────────────────
+async function setupFancyBorder() {
+  try {
+    const cornerSrc = `images/corner.png?v=${ASSET_VERSION}`;
+    const edgeSrc   = `images/border.png?v=${ASSET_VERSION}`;
+    const [corner, edge] = await Promise.all([loadImage(cornerSrc), loadImage(edgeSrc)]);
+    const W = corner.width;   // corners asumidos cuadrados (W×W). Ej. 42
+    const E = edge.width;     // edge horizontal: ancho variable, alto = W. Ej. 84 o más
+    // Canvas 9-slice: 3 columnas (W + E + W) × 3 filas (W + E + W).
+    // Slice será de W px en cada lado, lo que recorta los corners exactos.
+    const canvasW = W + E + W;
+    const canvasH = W + E + W;
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext('2d');
+    const drawRotated = (img, cx, cy, rad) => {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rad);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      ctx.restore();
+    };
+    // TL corner (sin rotar) en (0, 0)
+    ctx.drawImage(corner, 0, 0);
+    // Top edge (sin rotar) en (W, 0), ancho E
+    ctx.drawImage(edge, W, 0);
+    // TR corner (rotado 90°): centro en (W+E + W/2, W/2)
+    drawRotated(corner, W + E + W / 2, W / 2, Math.PI / 2);
+    // Left edge (rotado -90°): centro en (W/2, W + E/2). Resultado vertical W×E.
+    drawRotated(edge, W / 2, W + E / 2, -Math.PI / 2);
+    // Right edge (rotado 90°): centro en (W+E + W/2, W + E/2). Resultado vertical W×E.
+    drawRotated(edge, W + E + W / 2, W + E / 2, Math.PI / 2);
+    // BL corner (rotado -90°)
+    drawRotated(corner, W / 2, W + E + W / 2, -Math.PI / 2);
+    // Bottom edge (rotado 180°)
+    drawRotated(edge, W + E / 2, W + E + W / 2, Math.PI);
+    // BR corner (rotado 180°)
+    drawRotated(corner, W + E + W / 2, W + E + W / 2, Math.PI);
+    const dataUrl = canvas.toDataURL('image/png');
+    document.documentElement.style.setProperty('--fancy-border-image', `url(${dataUrl})`);
+    document.documentElement.style.setProperty('--fancy-border-size', `${W}px`);
+  } catch (e) {
+    console.warn('Failed to build fancy border:', e);
+  }
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
 
 // ──────────────────────────────────────────────────────────────────
 // Estado global del UI
@@ -95,6 +156,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   setupModalHandlers();
   setupBoardClickHandlers();
   hideAllModals();
+  setupFancyBorder();
 
   // Esperamos a Firebase Anonymous Auth
   try {
@@ -253,6 +315,10 @@ function onRoomUpdate(room) {
 
   // Reconstruir el game local desde el state de Firebase
   game = Game.fromSerialized(room.state);
+  // Sincronizar local selection vars con el state sincronizado.
+  const myPick = game.selection && localSeat ? game.selection[localSeat] : null;
+  selectedCardInstanceId = myPick || null;
+  selectedPlayerId = myPick ? localSeat : null;
   lastCombatLogLength = game.combatLog.length;
   render();
 
@@ -315,8 +381,17 @@ function renderSlot(playerId, slotName, card) {
 
   if (card) {
     // Durante setup, las cartas en slots del rival se ven face-down (revelo al coin flip).
-    if (g && g.phase === 'setup' && localSeat !== playerId) {
-      slotEl.appendChild(renderCardBackEl());
+    // Para el propietario, las propias se ven face-up pero con el icono de ojo tachado
+    // indicando que están face-down para el rival.
+    if (g && g.phase === 'setup') {
+      if (localSeat !== playerId) {
+        slotEl.appendChild(renderCardBackEl());
+      } else {
+        const cardEl = renderCardEl(card);
+        const eye = el('div', 'eye-overlay', '👁');
+        cardEl.appendChild(eye);
+        slotEl.appendChild(cardEl);
+      }
     } else {
       slotEl.appendChild(renderCardEl(card));
     }
@@ -353,7 +428,7 @@ function renderSkillSlot(playerId, skillState) {
       cardEl.classList.add(`state-${skillState.state}`);
       if (skillState.state === 'hidden') {
         // Mi propia skill bocaabajo: la veo con icono de ojo tachado
-        const eye = el('div', 'eye-overlay', '🚫👁');
+        const eye = el('div', 'eye-overlay', '👁');
         cardEl.appendChild(eye);
       }
     }
@@ -378,6 +453,19 @@ function renderSkillSlot(playerId, skillState) {
 function renderHand(playerId, hand) {
   const handEl = $(`p${playerId}-hand`);
   handEl.innerHTML = '';
+  const g = visibleState();
+  // Mostrar el halo de selección del rival SOLO cuando es su turno.
+  // Durante setup ambos jugadores actúan en paralelo (activePlayer puede
+  // ser null), entonces sí lo mostramos. En 'playing' solo si su seat
+  // coincide con activePlayer. Así el rival no ve mi selección cuando es
+  // mi turno de espectador (y viceversa).
+  const isOpponentActive = g && (
+    g.phase === 'setup' || (g.phase === 'playing' && g.activePlayer === playerId)
+  );
+  const oppSelectedId = (localSeat !== playerId && isOpponentActive)
+    ? (g.selection && g.selection[playerId])
+    : null;
+
   for (const card of hand) {
     let cardEl;
     if (localSeat === playerId) {
@@ -391,12 +479,36 @@ function renderHand(playerId, hand) {
       }
       cardEl.addEventListener('click', () => onCardClick(playerId, card.instanceId));
     } else {
-      // Mano del rival: mostrar dorso.
+      // Mano del rival: SIEMPRE dorso. Si esta carta es la que el rival tiene
+      // seleccionada, se le añade el halo dorado (clase .opponent-selected)
+      // sin revelarla y con el movimiento HACIA ABAJO (no como mi propia selección).
       cardEl = renderCardBackEl();
       cardEl.classList.add('in-hand', 'not-clickable');
+      if (oppSelectedId === card.instanceId) {
+        cardEl.classList.add('opponent-selected');
+      }
     }
     handEl.appendChild(cardEl);
   }
+
+  // Rellenar con placeholders los huecos no robados todavía (mano máxima = 5).
+  // Estos no son clickeables ni tienen efectos — solo visuales.
+  const HAND_MAX = 5;
+  const missing = Math.max(0, HAND_MAX - hand.length);
+  for (let i = 0; i < missing; i++) {
+    handEl.appendChild(renderEmptyHandSlotEl());
+  }
+}
+
+function renderEmptyHandSlotEl() {
+  const cardEl = el('div', 'card hand-empty');
+  const img = document.createElement('img');
+  img.src = `images/slot.png?v=${ASSET_VERSION}`;
+  img.alt = 'Empty hand slot';
+  img.className = 'hand-empty-img';
+  img.onerror = () => { cardEl.removeChild(img); };
+  cardEl.appendChild(img);
+  return cardEl;
 }
 
 function renderCardBackEl() {
@@ -520,15 +632,15 @@ function renderSetupActions(bar, g) {
 
   if (g.setupState.step === 'mulligan_or_confirm') {
     if (game.canDeclareMulligan(sid)) {
-      const btn = el('button', 'btn btn-mulligan', 'Declare Mulligan');
+      const btn = el('button', 'fancy-button', 'Declare Mulligan');
       btn.addEventListener('click', () => doAction(() => game.declareMulligan(sid)));
       bar.appendChild(btn);
     }
-    const confirmBtn = el('button', 'btn btn-confirm', 'Confirm hand');
+    const confirmBtn = el('button', 'fancy-button', 'Confirm hand');
     confirmBtn.addEventListener('click', () => doAction(() => game.confirmHand(sid)));
     bar.appendChild(confirmBtn);
   } else if (g.setupState.step === 'placing') {
-    const finishBtn = el('button', 'btn btn-confirm', 'Finish setup');
+    const finishBtn = el('button', 'fancy-button', 'Finish setup');
     finishBtn.addEventListener('click', () => {
       clearSelection();
       doAction(() => game.finishSetup(sid));
@@ -549,19 +661,19 @@ function renderPlayingActions(bar, g) {
 
   if (game.turnState && !game.turnState.drawnThisTurn) {
     if (game.canReplaceSkill(pid) && !game.turnState.isReplacingSkill) {
-      const btn = el('button', 'btn btn-replace', 'Replace Skill');
+      const btn = el('button', 'fancy-button', 'Replace Skill');
       btn.addEventListener('click', () => doAction(() => game.enterReplaceSkillMode(pid)));
       bar.appendChild(btn);
     }
     if (game.turnState && game.turnState.isReplacingSkill) {
-      const btn = el('button', 'btn btn-cancel', 'Cancel replacement');
+      const btn = el('button', 'fancy-button', 'Cancel replacement');
       btn.addEventListener('click', () => {
         clearSelection();
         doAction(() => game.exitReplaceSkillMode(pid));
       });
       bar.appendChild(btn);
     }
-    const drawBtn = el('button', 'btn btn-draw', 'Draw (step 2)');
+    const drawBtn = el('button', 'fancy-button', 'Draw');
     drawBtn.addEventListener('click', () => doAction(() => game.drawPhase(pid)));
     bar.appendChild(drawBtn);
   }
@@ -570,8 +682,8 @@ function renderPlayingActions(bar, g) {
     bar.appendChild(el('div', 'action-warn', '⚠ You must fill empty slots with units from your hand.'));
   }
 
-  const endBtn = el('button', 'btn btn-end-turn', 'End turn');
-  if (!game.canEndTurn(pid)) endBtn.disabled = true;
+  const endBtn = el('button', 'fancy-button', isAnimating ? 'Resolving...' : 'End turn');
+  if (!game.canEndTurn(pid) || isAnimating) endBtn.disabled = true;
   endBtn.addEventListener('click', performEndTurn);
   bar.appendChild(endBtn);
 }
@@ -606,14 +718,28 @@ function onCardClick(playerId, instanceId) {
   if (isAnimating) return;
   if (localSeat !== playerId) return; // no puedes clickear cartas del rival
 
-  if (selectedCardInstanceId === instanceId && selectedPlayerId === playerId) {
-    clearSelection();
+  // Toggle: si ya estaba seleccionada, deselecciona.
+  const alreadySelected = selectedCardInstanceId === instanceId && selectedPlayerId === playerId;
+  const newInstanceId = alreadySelected ? null : instanceId;
+
+  // Actualizar locales para render inmediato
+  selectedCardInstanceId = newInstanceId;
+  selectedPlayerId = newInstanceId ? playerId : null;
+
+  // Sincronizar con Firebase para que el rival vea la selección en tiempo real,
+  // PERO solo si es mi turno (en 'playing'). En 'setup' ambos jugadores actúan
+  // en paralelo, así que ahí sí broadcasteamos siempre.
+  if (game) {
+    game.setSelection(playerId, newInstanceId);
     render();
-    return;
+    const isMyTurnToBroadcast = game.phase === 'setup' ||
+      (game.phase === 'playing' && game.activePlayer === localSeat);
+    if (isMyTurnToBroadcast) {
+      persistState();
+    }
+  } else {
+    render();
   }
-  selectedCardInstanceId = instanceId;
-  selectedPlayerId = playerId;
-  render();
 }
 
 function onSlotClick(playerId, slotName) {
@@ -637,6 +763,15 @@ function onSlotClick(playerId, slotName) {
 function clearSelection() {
   selectedCardInstanceId = null;
   selectedPlayerId = null;
+  if (game && localSeat) {
+    game.setSelection(localSeat, null);
+    // Mismo guard que en onCardClick: solo broadcasteamos cuando es mi turno.
+    const isMyTurnToBroadcast = game.phase === 'setup' ||
+      (game.phase === 'playing' && game.activePlayer === localSeat);
+    if (isMyTurnToBroadcast) {
+      persistState();
+    }
+  }
 }
 
 function setupBoardClickHandlers() {

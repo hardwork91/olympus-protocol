@@ -45,6 +45,15 @@ export class Game {
 
     // Resultado final
     this.gameOver = null; // { winner: 1|2|null, reason: 'life'|'turnLimit'|'draw', stats: {...} }
+
+    // Selección de carta por jugador (visible al rival): instanceId | null por seat.
+    this.selection = { 1: null, 2: null };
+  }
+
+  // Actualiza la carta seleccionada por un jugador (null para limpiar).
+  setSelection(playerId, instanceId) {
+    if (!this.selection) this.selection = { 1: null, 2: null };
+    this.selection[playerId] = instanceId || null;
   }
 
   // ──────────────────────────────────────────────────────────────────
@@ -412,6 +421,7 @@ export class Game {
         2: serializePlayer(this.players[2]),
       },
       gameOver: this.gameOver || null,
+      selection: this.selection || { 1: null, 2: null },
     };
   }
 
@@ -431,6 +441,7 @@ export class Game {
       2: deserializePlayer(data.players[2]),
     };
     game.gameOver = data.gameOver || null;
+    game.selection = data.selection || { 1: null, 2: null };
     return game;
   }
 }

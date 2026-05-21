@@ -28,7 +28,11 @@ body {
   height: 100%;
   background: var(--bg-deep);
   color: var(--text-light);
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
 }
 
 #root {

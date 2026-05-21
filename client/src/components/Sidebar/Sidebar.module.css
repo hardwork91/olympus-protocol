@@ -25,9 +25,9 @@
 }
 
 .title {
-  margin: 0;
+  margin: 24px 0 0;
   color: var(--gold);
-  font-size: 22px;
+  font-size: 20px;
   letter-spacing: 0.08em;
   font-family: 'Cinzel', 'Times New Roman', serif;
   font-weight: 700;

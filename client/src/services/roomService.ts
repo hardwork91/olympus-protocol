@@ -176,12 +176,15 @@ export function getRoomIdFromURL(): string | null {
 }
 
 /** Construye una URL absoluta apuntando a la raíz con `?room=XYZ`.
+ *  Usa import.meta.env.BASE_URL para que el path correcto funcione tanto
+ *  en dev ('/') como en producción ('/olympus-protocol/').
  *  El destinatario debe llegar al Menu para que la auth anónima cree su
  *  propio usuario antes de unirse — si lo mandamos directo a /game/XYZ
  *  recibe "you are not seated in this room" porque aún no se unió. */
 export function buildRoomURL(roomId: string): string {
   const url = new URL(window.location.href);
-  url.pathname = '/';
-  url.searchParams.set('room', roomId);
+  url.pathname = import.meta.env.BASE_URL;
+  url.search = `?room=${roomId}`;
+  url.hash = '';
   return url.toString();
 }

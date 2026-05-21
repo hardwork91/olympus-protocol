@@ -1,8 +1,12 @@
 // ============================================================================
 // Hand — mano de cartas de un jugador.
-// Si es local: cartas face-up, clickeables. Si es rival: dorsos.
-// `AnimatePresence` permite que Framer Motion anime el enter/exit cuando
-// las cartas se añaden o se sacan de la mano.
+//
+// Layout en dos capas (CSS grid stack):
+//   1. placeholdersLayer (z-index implícito): 5 slot.png siempre visibles.
+//   2. cardsLayer: las cartas reales (AnimatePresence) montadas encima.
+//
+// Esto permite que la animación de entrada/salida de cartas sea independiente
+// del placeholder — el slot.png queda fijo y la carta vuela sobre él.
 // ============================================================================
 
 import Card from '@components/Card/Card';
@@ -30,29 +34,39 @@ export default function Hand({
   onCardClick,
   maxSlots = 5,
 }: HandProps) {
-  const placeholders = Math.max(0, maxSlots - cards.length);
+  // Robo viene desde fuera del viewport (abajo si es local, arriba si rival).
+  const enterFromY = isLocal ? '100vh' : '-100vh';
 
   return (
     <div className={clsx(styles.hand, isLocal ? styles.local : styles.opponent)}>
-      <AnimatePresence mode="popLayout">
-        {cards.map((card) => {
-          const isSelected =
-            card.instanceId === selectedInstanceId && (isLocal || !!showOpponentSelection);
-          return (
-            <Card
-              key={card.instanceId}
-              card={card}
-              faceDown={!isLocal}
-              selected={isLocal && isSelected}
-              opponentSelected={!isLocal && isSelected}
-              onClick={isLocal && onCardClick ? () => onCardClick(card.instanceId) : undefined}
-            />
-          );
-        })}
-      </AnimatePresence>
-      {Array.from({ length: placeholders }, (_, i) => (
-        <div key={`ph-${playerId}-${i}`} className={styles.placeholder} />
-      ))}
+      {/* Capa 1 — placeholders estáticos. Siempre 5, nunca se animan. */}
+      <div className={styles.placeholdersLayer}>
+        {Array.from({ length: maxSlots }, (_, i) => (
+          <div className={styles.placeholder} key={`ph-${playerId}-${i}`} />
+        ))}
+      </div>
+
+      {/* Capa 2 — cartas animadas, montadas encima. */}
+      <div className={styles.cardsLayer}>
+        <AnimatePresence mode="popLayout">
+          {cards.map((card, i) => {
+            const isSelected =
+              card.instanceId === selectedInstanceId && (isLocal || !!showOpponentSelection);
+            return (
+              <Card
+                key={card.instanceId}
+                card={card}
+                faceDown={!isLocal}
+                selected={isLocal && isSelected}
+                opponentSelected={!isLocal && isSelected}
+                onClick={isLocal && onCardClick ? () => onCardClick(card.instanceId) : undefined}
+                enterFromY={enterFromY}
+                enterDelay={i * 0.08}
+              />
+            );
+          })}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

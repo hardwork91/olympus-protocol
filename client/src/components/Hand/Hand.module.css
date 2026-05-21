@@ -1,22 +1,27 @@
+/* Layout en grid con 1 sola "cell" donde se apilan ambas capas
+   (técnica de grid stacking). Las dos capas reciben grid-area: stack
+   y por lo tanto comparten exactamente las mismas dimensiones. */
 .hand {
+  display: grid;
+  grid-template-areas: 'stack';
+  min-height: 0;
+  align-content: start;
+}
+
+.placeholdersLayer,
+.cardsLayer {
+  grid-area: stack;
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
   align-content: flex-start;
-  padding: 0;
-  min-height: 0;
-  overflow-y: auto;
-  background: transparent;
 }
 
-.local {
+/* Capa de placeholders: siempre visible, no interactiva. */
+.placeholdersLayer {
+  pointer-events: none;
 }
 
-.opponent {
-  opacity: 0.95;
-}
-
-/* Placeholder de carta no robada todavía (usa slot.png con opacity) */
 .placeholder {
   width: 190px;
   height: 266px;
@@ -24,11 +29,14 @@
   border-radius: 6px;
   flex-shrink: 0;
   opacity: 0.55;
-  pointer-events: none;
 }
 
-/* La mano del rival es face-down: cartas más pequeñas (no in-hand) */
-.opponent .placeholder {
-  width: 135px;
-  height: 189px;
+/* Capa de cartas: las cartas se renderizan encima de los placeholders,
+   alineadas por el mismo flex layout. */
+.cardsLayer {
+  /* z-index implícito por orden de DOM (es el segundo grid item) */
+}
+
+/* La mano del rival es ligeramente más opaca */
+.opponent {
 }

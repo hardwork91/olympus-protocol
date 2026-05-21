@@ -21,14 +21,14 @@ interface CardProps {
   onClick?: () => void;
   variant?: 'inHand' | 'inSlot';
   skillState?: 'hidden' | 'active' | 'consumed';
+  /** Posición Y inicial para la animación de entrada (default: -16 px).
+   *  Acepta `'100vh'` o `'-100vh'` para que la carta venga desde fuera
+   *  del viewport (efecto de robo de mazo). */
+  enterFromY?: number | string;
+  /** Delay en segundos para la animación de entrada (stagger cuando entran
+   *  varias cartas a la vez). Solo aplica al mount inicial. */
+  enterDelay?: number;
 }
-
-const cardMotion = {
-  initial: { opacity: 0, y: -16, scale: 0.92 },
-  animate: { opacity: 1, y: 0, scale: 1 },
-  exit: { opacity: 0, scale: 0.85, transition: { duration: 0.18 } },
-  transition: { type: 'spring', stiffness: 320, damping: 26 } as const,
-};
 
 export default function Card({
   card,
@@ -39,7 +39,31 @@ export default function Card({
   onClick,
   variant = 'inHand',
   skillState,
+  enterFromY = -16,
+  enterDelay = 0,
 }: CardProps) {
+  // Spring-based entrance. La Y inicial es parametrizable para que el robo
+  // pueda venir desde fuera de la pantalla (Hand pasa '100vh' o '-100vh').
+  // Cuando viene desde lejos suavizamos el spring (damping mayor) para no
+  // overshoot demasiado al llegar.
+  const isLongDistance =
+    typeof enterFromY === 'string' && (enterFromY.includes('vh') || enterFromY.includes('%'));
+  const baseSpring = isLongDistance
+    ? ({ type: 'spring', stiffness: 220, damping: 30 } as const)
+    : ({ type: 'spring', stiffness: 320, damping: 26 } as const);
+  const cardMotion = {
+    initial: { opacity: 0, y: enterFromY, scale: 0.92 },
+    // El delay vive en animate.transition (no en el global) para que solo
+    // afecte al mount inicial, no a hover/tap subsecuentes.
+    animate: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { ...baseSpring, delay: enterDelay },
+    },
+    exit: { opacity: 0, scale: 0.85, transition: { duration: 0.18 } },
+  };
+
   const className = clsx(
     styles.card,
     variant === 'inSlot' && styles.inSlot,
@@ -63,7 +87,6 @@ export default function Card({
         initial={cardMotion.initial}
         animate={cardMotion.animate}
         exit={cardMotion.exit}
-        transition={cardMotion.transition}
         whileHover={onClick ? { y: -6 } : undefined}
         whileTap={onClick ? { scale: 0.96 } : undefined}
       >
@@ -85,7 +108,6 @@ export default function Card({
       initial={cardMotion.initial}
       animate={cardMotion.animate}
       exit={cardMotion.exit}
-      transition={cardMotion.transition}
       whileHover={onClick ? { y: -6 } : undefined}
       whileTap={onClick ? { scale: 0.96 } : undefined}
     >

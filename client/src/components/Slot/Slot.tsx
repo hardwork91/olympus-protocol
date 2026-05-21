@@ -52,7 +52,10 @@ export default function Slot({
         <Card
           card={card}
           variant="inSlot"
-          faceDown={hideSkillFromOpponent || (slot === 'skill' && skillState === 'hidden')}
+          /* Solo cara-abajo cuando es la skill del rival y está hidden.
+             Mi propia skill SIEMPRE se ve face-up para mí (es mi carta).
+             El rival la ve face-down hasta que se voltea (active). */
+          faceDown={hideSkillFromOpponent}
           skillState={skillState}
         />
       ) : (

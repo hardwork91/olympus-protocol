@@ -74,7 +74,7 @@ export default function Menu() {
       setWaitingRoomId(roomId);
       setMode('waiting');
       // Actualiza la URL para que sea shareable, sin navegación.
-      window.history.replaceState({}, '', `/?room=${roomId}`);
+      window.history.replaceState({}, '', `${import.meta.env.BASE_URL}?room=${roomId}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -113,7 +113,7 @@ export default function Menu() {
   const handleCancelWaiting = (): void => {
     setMode('idle');
     setWaitingRoomId(null);
-    window.history.replaceState({}, '', '/');
+    window.history.replaceState({}, '', import.meta.env.BASE_URL);
   };
 
   if (authLoading) {

@@ -1,39 +1,25 @@
-/* Layout en grid con 1 sola "cell" donde se apilan ambas capas
-   (técnica de grid stacking). Las dos capas reciben grid-area: stack
-   y por lo tanto comparten exactamente las mismas dimensiones. */
 .hand {
-  display: grid;
-  grid-template-areas: 'stack';
-  min-height: 0;
-  align-content: start;
-}
-
-/* Ambas capas son grids internos con columnas fijas (configuradas inline
-   con repeat(maxSlots, 190px) para que matchen las posiciones de slot). */
-.placeholdersLayer,
-.cardsLayer {
-  grid-area: stack;
-  display: grid;
+  display: flex;
   gap: 6px;
-  align-content: flex-start;
+  align-items: flex-start;
 }
 
-/* Capa de placeholders: siempre visible, no interactiva. */
-.placeholdersLayer {
-  pointer-events: none;
+/* Cada slot es un container fijo (190x266) con position:relative.
+   Dentro: placeholder absoluto (fondo) + opcional card absoluta encima. */
+.slot {
+  position: relative;
+  width: 190px;
+  height: 266px;
+  flex-shrink: 0;
 }
 
 .placeholder {
-  width: 190px;
-  height: 266px;
+  position: absolute;
+  inset: 0;
   background: url('/images/slot.png') center / cover no-repeat;
   border-radius: 6px;
   opacity: 0.55;
-}
-
-/* Capa de cartas: cartas posicionadas en columnas via grid-column inline. */
-.cardsLayer {
-  /* z-index implícito por orden de DOM (es el segundo grid item) */
+  pointer-events: none;
 }
 
 .opponent {

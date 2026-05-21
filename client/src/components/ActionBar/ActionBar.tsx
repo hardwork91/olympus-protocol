@@ -120,6 +120,10 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
     const canEnd = game.canEndTurn(localSeat);
     const canReplace = game.canReplaceSkill(localSeat);
     const isReplacing = !!state.turnState?.isReplacingSkill;
+    // La mano máxima es 5. Si ya está llena, no mostramos Draw porque sería
+    // un no-op (drawTo cap at 5). React re-evalúa esto en cada render, así
+    // que se actualiza automáticamente al colocar/jugar una carta.
+    const handFull = state.players[localSeat].hand.length >= 5;
 
     return (
       <div className={styles.bar}>
@@ -147,7 +151,7 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
               Cancel replace
             </button>
           )}
-          {!drawn && (
+          {!drawn && !handFull && (
             <button
               className={btnCls}
               onClick={() => run(() => gameService.drawPhase(roomId, localSeat))}

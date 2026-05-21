@@ -144,8 +144,12 @@
    El hover/tap lift y la animación de entrada/salida los maneja Framer.
    Solo dejamos box-shadow / filter / opacity acá. */
 
+/* Cartas no clickeables: NO usamos atributo `disabled` para que el botón
+   siga disparando mousemove (los botones disabled HTML no emiten mouse
+   events). En su lugar dejamos aria-disabled + tabIndex=-1 y forzamos
+   cursor de flecha aquí. */
 .card.notClickable {
-  pointer-events: none;
+  cursor: var(--cursor-arrow), default;
 }
 
 .card.selected {
@@ -166,4 +170,31 @@
 }
 .skillConsumed {
   filter: brightness(0.5) sepia(1) hue-rotate(-30deg);
+}
+
+/* ─── Spotlight: efecto de luz orbital amarilla que sigue al mouse ──
+   Sólo en cartas clickeables. La posición se actualiza desde JS via
+   las CSS vars --mouse-x y --mouse-y (px relativos a la carta).
+   mix-blend-mode: overlay → la luz se "refleja" sobre los colores de
+   abajo en vez de solo opacarlos. */
+.spotlight {
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5cqi;
+  pointer-events: none;
+  z-index: 4;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  /* Radio 280px (doble) + alphas duplicados para más intensidad. */
+  background: radial-gradient(
+    circle 280px at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(255, 215, 80, 0.55) 0%,
+    rgba(255, 200, 50, 0.25) 30%,
+    transparent 65%
+  );
+  mix-blend-mode: overlay;
+}
+
+.card:hover .spotlight {
+  opacity: 1;
 }

@@ -11,6 +11,7 @@ import type { Card as CardType } from '@shared/types';
 import { asset } from '@utils/asset';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
+import { useRef, type MouseEvent } from 'react';
 import styles from './Card.module.css';
 
 interface CardProps {
@@ -46,6 +47,19 @@ export default function Card({
   enterDelay = 0,
   style,
 }: CardProps) {
+  // Tracking del mouse para el efecto "spotlight" (luz orbital amarilla).
+  // Actualizamos las CSS vars --mouse-x/--mouse-y directamente sobre el DOM
+  // para evitar re-renders de React en cada movimiento del mouse.
+  // Aplica a TODAS las cartas (hand, slots, rival) — no solo clickeables.
+  const cardRef = useRef<HTMLButtonElement>(null);
+
+  const handleMouseMove = (e: MouseEvent<HTMLButtonElement>): void => {
+    if (!cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    cardRef.current.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
+    cardRef.current.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+  };
+
   // Spring-based entrance. La Y inicial es parametrizable para que el robo
   // pueda venir desde fuera de la pantalla (Hand pasa '100vh' o '-100vh').
   // Cuando viene desde lejos suavizamos el spring (damping mayor) para no
@@ -83,9 +97,12 @@ export default function Card({
   if (faceDown || !card) {
     return (
       <motion.button
+        ref={cardRef}
         type="button"
         onClick={onClick}
-        disabled={!onClick}
+        onMouseMove={handleMouseMove}
+        aria-disabled={!onClick}
+        tabIndex={onClick ? 0 : -1}
         className={clsx(className, styles.cardBack)}
         style={style}
         layout
@@ -96,6 +113,7 @@ export default function Card({
         whileTap={onClick ? { scale: 0.96 } : undefined}
       >
         <img src={asset('/images/back.png')} alt="Card back" className={styles.fullImg} />
+        <div className={styles.spotlight} aria-hidden="true" />
       </motion.button>
     );
   }
@@ -105,9 +123,12 @@ export default function Card({
 
   return (
     <motion.button
+      ref={cardRef}
       type="button"
       onClick={onClick}
-      disabled={!onClick}
+      onMouseMove={handleMouseMove}
+      aria-disabled={!onClick}
+      tabIndex={onClick ? 0 : -1}
       className={clsx(className, isUnit ? styles.unit : styles.skill)}
       style={style}
       layout
@@ -134,6 +155,10 @@ export default function Card({
       ) : (
         <div className={clsx(styles.frameDesc, styles.skillDesc)}>{card.effect}</div>
       )}
+      {/* Capa 4: spotlight que sigue al mouse (luz orbital amarilla).
+          Aplica a todas las cartas (hand, slots, rival) — el efecto se
+          activa solo en :hover. */}
+      <div className={styles.spotlight} aria-hidden="true" />
     </motion.button>
   );
 }

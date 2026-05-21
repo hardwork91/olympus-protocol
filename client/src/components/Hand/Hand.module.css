@@ -8,12 +8,13 @@
   align-content: start;
 }
 
+/* Ambas capas son grids internos con columnas fijas (configuradas inline
+   con repeat(maxSlots, 190px) para que matchen las posiciones de slot). */
 .placeholdersLayer,
 .cardsLayer {
   grid-area: stack;
-  display: flex;
+  display: grid;
   gap: 6px;
-  flex-wrap: wrap;
   align-content: flex-start;
 }
 
@@ -27,16 +28,13 @@
   height: 266px;
   background: url('/images/slot.png') center / cover no-repeat;
   border-radius: 6px;
-  flex-shrink: 0;
   opacity: 0.55;
 }
 
-/* Capa de cartas: las cartas se renderizan encima de los placeholders,
-   alineadas por el mismo flex layout. */
+/* Capa de cartas: cartas posicionadas en columnas via grid-column inline. */
 .cardsLayer {
   /* z-index implícito por orden de DOM (es el segundo grid item) */
 }
 
-/* La mano del rival es ligeramente más opaca */
 .opponent {
 }

@@ -29,6 +29,8 @@ interface CardProps {
   /** Delay en segundos para la animación de entrada (stagger cuando entran
    *  varias cartas a la vez). Solo aplica al mount inicial. */
   enterDelay?: number;
+  /** Style inline opcional (usado por Hand para posicionar via grid-column). */
+  style?: React.CSSProperties;
 }
 
 export default function Card({
@@ -42,6 +44,7 @@ export default function Card({
   skillState,
   enterFromY = -16,
   enterDelay = 0,
+  style,
 }: CardProps) {
   // Spring-based entrance. La Y inicial es parametrizable para que el robo
   // pueda venir desde fuera de la pantalla (Hand pasa '100vh' o '-100vh').
@@ -84,6 +87,7 @@ export default function Card({
         onClick={onClick}
         disabled={!onClick}
         className={clsx(className, styles.cardBack)}
+        style={style}
         layout
         initial={cardMotion.initial}
         animate={cardMotion.animate}
@@ -105,6 +109,7 @@ export default function Card({
       onClick={onClick}
       disabled={!onClick}
       className={clsx(className, isUnit ? styles.unit : styles.skill)}
+      style={style}
       layout
       initial={cardMotion.initial}
       animate={cardMotion.animate}

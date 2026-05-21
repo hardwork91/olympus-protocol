@@ -1,87 +1,137 @@
 // ============================================================================
 // gameService — "fake backend" para acciones del juego.
 //
-// Cada función PARECE un endpoint HTTP. Hoy ejecuta la lógica localmente con
-// `@server/gameEngine` y persiste vía transacción en Firebase RTDB.
+// Cada función PARECE un endpoint HTTP. Hoy ejecuta la lógica localmente:
+//   1) Lee el state actual de Firebase RTDB.
+//   2) Reconstruye Game.fromSerialized.
+//   3) Valida la acción (caería un endpoint real igual de fuerte).
+//   4) Aplica la mutación.
+//   5) Escribe el nuevo state en Firebase con runTransaction (atómico).
+//
 // Mañana: el cuerpo cambia a `fetch('/api/...')` o WebSocket. La interfaz
 // pública NO cambia → los componentes no se enteran.
-//
-// STUBS de Fase 2: las firmas + JSDoc están listas. La implementación real
-// (con Firebase) llega en Fase 3 (cuando creemos services/firebase.ts).
 // ============================================================================
 
-import type { GameConfig, PlayerId, SerializedGameState, SlotIndicator } from '@shared/types';
+import { Game } from '@server/gameEngine';
+import type { PlayerId, SerializedGameState, SlotIndicator } from '@shared/types';
+import { ref, runTransaction, set } from 'firebase/database';
+import { db, sanitizeForFirebase } from './firebase';
 
-/** Crea una sala nueva y devuelve su id. */
-export async function createRoom(_config: GameConfig): Promise<{ roomId: string }> {
-  throw new Error('createRoom: not implemented (Fase 3)');
+/** Helpers internos: aplica una mutación al state con transacción de RTDB. */
+async function mutateGameState(
+  roomId: string,
+  mutate: (game: Game) => boolean,
+  actionLabel: string,
+): Promise<SerializedGameState> {
+  const stateRef = ref(db, `games/${roomId}/state`);
+  const result = await runTransaction(stateRef, (current: SerializedGameState | null) => {
+    if (!current) return current;
+    const game = Game.fromSerialized(current);
+    const success = mutate(game);
+    if (!success) {
+      // Abort: el cliente intentó algo inválido (puede ser fuera de turno,
+      // slot ocupado, etc.). No escribimos.
+      return current;
+    }
+    return sanitizeForFirebase(game.serialize());
+  });
+
+  if (!result.committed) {
+    throw new Error(`${actionLabel}: transaction did not commit.`);
+  }
+  const value = result.snapshot.val();
+  if (!value) {
+    throw new Error(`${actionLabel}: room state missing.`);
+  }
+  return value as SerializedGameState;
 }
 
-/** Une al usuario actual a una sala existente. Asigna seat 2. */
-export async function joinRoom(_roomId: string): Promise<{ seat: PlayerId }> {
-  throw new Error('joinRoom: not implemented (Fase 3)');
+// ─── Setup ──────────────────────────────────────────────────────────────
+
+export async function declareMulligan(
+  roomId: string,
+  playerId: PlayerId,
+): Promise<SerializedGameState> {
+  return mutateGameState(roomId, (g) => g.declareMulligan(playerId), 'declareMulligan');
 }
 
-/** Coloca una carta en un slot. Server-authoritative: valida antes de mutar. */
+export async function confirmHand(
+  roomId: string,
+  playerId: PlayerId,
+): Promise<SerializedGameState> {
+  return mutateGameState(roomId, (g) => g.confirmHand(playerId), 'confirmHand');
+}
+
+export async function finishSetup(
+  roomId: string,
+  playerId: PlayerId,
+): Promise<SerializedGameState> {
+  return mutateGameState(roomId, (g) => g.finishSetup(playerId), 'finishSetup');
+}
+
+// ─── Acciones de turno ──────────────────────────────────────────────────
+
 export async function placeCard(
-  _roomId: string,
-  _playerId: PlayerId,
-  _instanceId: string,
-  _slot: SlotIndicator,
-): Promise<void> {
-  throw new Error('placeCard: not implemented (Fase 3)');
+  roomId: string,
+  playerId: PlayerId,
+  instanceId: string,
+  slot: SlotIndicator,
+): Promise<SerializedGameState> {
+  return mutateGameState(roomId, (g) => g.placeCard(playerId, instanceId, slot), 'placeCard');
 }
 
-/** Declara mulligan (devuelve mano al mazo, baraja, roba 5). */
-export async function declareMulligan(_roomId: string, _playerId: PlayerId): Promise<void> {
-  throw new Error('declareMulligan: not implemented (Fase 3)');
+export async function enterReplaceSkillMode(
+  roomId: string,
+  playerId: PlayerId,
+): Promise<SerializedGameState> {
+  return mutateGameState(roomId, (g) => g.enterReplaceSkillMode(playerId), 'enterReplaceSkillMode');
 }
 
-/** Confirma la mano y pasa a colocar unidades/skill. */
-export async function confirmHand(_roomId: string, _playerId: PlayerId): Promise<void> {
-  throw new Error('confirmHand: not implemented (Fase 3)');
+export async function exitReplaceSkillMode(
+  roomId: string,
+  playerId: PlayerId,
+): Promise<SerializedGameState> {
+  return mutateGameState(roomId, (g) => g.exitReplaceSkillMode(playerId), 'exitReplaceSkillMode');
 }
 
-/** Finaliza el setup del jugador (pasa al rival o dispara coinFlip). */
-export async function finishSetup(_roomId: string, _playerId: PlayerId): Promise<void> {
-  throw new Error('finishSetup: not implemented (Fase 3)');
+export async function drawPhase(roomId: string, playerId: PlayerId): Promise<SerializedGameState> {
+  return mutateGameState(
+    roomId,
+    (g) => {
+      if (g.activePlayer !== playerId) return false;
+      g.drawPhase(playerId);
+      return true;
+    },
+    'drawPhase',
+  );
 }
 
-/** Activa el modo "reemplazar skill". */
-export async function enterReplaceSkillMode(_roomId: string, _playerId: PlayerId): Promise<void> {
-  throw new Error('enterReplaceSkillMode: not implemented (Fase 3)');
+export async function endTurn(roomId: string, playerId: PlayerId): Promise<SerializedGameState> {
+  return mutateGameState(
+    roomId,
+    (g) => {
+      if (g.activePlayer !== playerId) return false;
+      const result = g.endTurn();
+      return result !== null;
+    },
+    'endTurn',
+  );
 }
 
-/** Cancela el modo de reemplazo. */
-export async function exitReplaceSkillMode(_roomId: string, _playerId: PlayerId): Promise<void> {
-  throw new Error('exitReplaceSkillMode: not implemented (Fase 3)');
-}
+// ─── UI sync (no autoritativo) ───────────────────────────────────────────
 
-/** Robar (paso 2 del turno). */
-export async function drawPhase(_roomId: string, _playerId: PlayerId): Promise<void> {
-  throw new Error('drawPhase: not implemented (Fase 3)');
-}
-
-/** Finalizar el turno: resuelve combate y pasa el control al rival. */
-export async function endTurn(_roomId: string, _playerId: PlayerId): Promise<void> {
-  throw new Error('endTurn: not implemented (Fase 3)');
-}
-
-/** Actualiza la carta seleccionada por el jugador (UI sync, no autoritativo). */
+/**
+ * Actualiza la carta seleccionada del jugador. Esto NO es una acción de juego
+ * — es solo para sincronizar UI (mostrar halo al rival). Por eso usamos set()
+ * directo (no transacción), es más liviano.
+ */
 export async function setSelection(
-  _roomId: string,
-  _playerId: PlayerId,
-  _instanceId: string | null,
+  roomId: string,
+  playerId: PlayerId,
+  instanceId: string | null,
 ): Promise<void> {
-  throw new Error('setSelection: not implemented (Fase 3)');
-}
-
-// ─── Listeners ───────────────────────────────────────────────────────────
-
-/** Suscribe a cambios del estado del juego. Devuelve función de unsubscribe. */
-export function listenRoom(
-  _roomId: string,
-  _onChange: (state: SerializedGameState | null) => void,
-): () => void {
-  throw new Error('listenRoom: not implemented (Fase 3)');
+  await set(
+    ref(db, `games/${roomId}/state/selection/${playerId}`),
+    sanitizeForFirebase(instanceId),
+  );
 }

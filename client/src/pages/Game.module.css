@@ -1,0 +1,60 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: var(--bg-deep);
+  color: var(--text-light);
+  text-align: center;
+  gap: 12px;
+}
+
+.page h1 {
+  margin: 0;
+  color: var(--gold);
+  font-size: 28px;
+  letter-spacing: 0.08em;
+}
+
+.code {
+  font-family: 'Consolas', monospace;
+  font-size: 36px;
+  font-weight: bold;
+  letter-spacing: 0.2em;
+  color: var(--gold);
+  background: var(--bg-deep);
+  border: 2px solid var(--gold);
+  border-radius: 6px;
+  padding: 16px 24px;
+  margin: 8px 0;
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  max-width: 400px;
+  line-height: 1.5;
+  margin: 12px 0;
+}
+
+.seat {
+  color: var(--text-dim);
+  font-size: 16px;
+}
+
+.page button {
+  padding: 10px 20px;
+  background: var(--gold);
+  color: var(--bg-deep);
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.page button:hover {
+  background: var(--gold-bright);
+}

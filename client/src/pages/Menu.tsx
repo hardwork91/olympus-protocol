@@ -1,17 +1,23 @@
 // ============================================================================
-// Menu — pantalla inicial. Flujo:
-//   1. Estado 'idle': muestra botones "Create" / "Join".
-//   2. Estado 'creating': formulario de configuración del juego.
-//   3. Estado 'joining': input del room code.
+// Menu — pantalla única para todo el lobby (no saltos entre páginas).
+// Estados (mode):
+//   1. 'idle'     — botones Create / Join
+//   2. 'creating' — formulario de configuración
+//   3. 'joining'  — formulario de código de sala
+//   4. 'waiting'  — sala creada, esperando a player 2 (con Copy URL)
 //
-// Al detectar ?room=XYZ en la URL, pre-abrimos el flujo de Join con el código.
+// Al detectar ?room=XYZ en la URL → auto-abre el flujo de Join con el código.
+// Cuando ambos jugadores están en la sala → navega a /game/:roomId.
+// La URL se actualiza con history.replaceState al entrar en 'waiting' para
+// que sea shareable sin navegación.
 // ============================================================================
 
+import { useRoom } from '@hooks/useRoom';
 import { useUser } from '@hooks/useUser';
-import { createRoom, getRoomIdFromURL, joinRoom } from '@services/roomService';
+import { buildRoomURL, createRoom, getRoomIdFromURL, joinRoom } from '@services/roomService';
 import clsx from 'clsx';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './Menu.module.css';
 
@@ -22,20 +28,39 @@ const modeMotion = {
   transition: { duration: 0.22 },
 };
 
-type MenuMode = 'idle' | 'creating' | 'joining';
+type MenuMode = 'idle' | 'creating' | 'joining' | 'waiting';
 
 export default function Menu() {
   const navigate = useNavigate();
   const { userId, loading: authLoading, error: authError } = useUser();
-  // Lee ?room=XYZ del URL UNA VEZ durante el render inicial (lazy initializer)
-  // — más limpio que un useEffect que hace setState en mount.
+
+  // Lee ?room=XYZ del URL UNA VEZ en mount.
   const initialUrlCode = useState(() => getRoomIdFromURL())[0];
+
   const [mode, setMode] = useState<MenuMode>(initialUrlCode ? 'joining' : 'idle');
   const [vida, setVida] = useState(20);
   const [turnos, setTurnos] = useState(20);
   const [code, setCode] = useState(initialUrlCode ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [waitingRoomId, setWaitingRoomId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Suscripción a la sala (solo activa cuando estamos en 'waiting').
+  const { room } = useRoom(mode === 'waiting' ? waitingRoomId : null, userId);
+
+  // Cuando ambos seats estén ocupados → navega al game.
+  useEffect(() => {
+    if (
+      mode === 'waiting' &&
+      waitingRoomId &&
+      room &&
+      room.seats[1] &&
+      room.seats[2]
+    ) {
+      navigate(`/game/${waitingRoomId}`);
+    }
+  }, [mode, room, waitingRoomId, navigate]);
 
   const handleCreate = async (): Promise<void> => {
     setError(null);
@@ -46,7 +71,10 @@ export default function Menu() {
         maxTurnos: turnos,
         forceP1Start: false,
       });
-      navigate(`/game/${roomId}`);
+      setWaitingRoomId(roomId);
+      setMode('waiting');
+      // Actualiza la URL para que sea shareable, sin navegación.
+      window.history.replaceState({}, '', `/?room=${roomId}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -71,6 +99,23 @@ export default function Menu() {
     }
   };
 
+  const handleCopyUrl = async (): Promise<void> => {
+    if (!waitingRoomId) return;
+    try {
+      await navigator.clipboard.writeText(buildRoomURL(waitingRoomId));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleCancelWaiting = (): void => {
+    setMode('idle');
+    setWaitingRoomId(null);
+    window.history.replaceState({}, '', '/');
+  };
+
   if (authLoading) {
     return <div className={styles.menu}>Connecting…</div>;
   }
@@ -83,14 +128,12 @@ export default function Menu() {
 
   return (
     <div className={styles.menu}>
-      <header className={styles.header}>
-        <h1 className={styles.title}>OLYMPUS PROTOCOL</h1>
-        <p className={styles.subtitle}>1v1 Online Simulator · Phase 3</p>
-      </header>
-
       <div className={styles.cardWrapper}>
         <div className={styles.cardDeco} />
         <div className={clsx(styles.card, 'fancy-border')}>
+          <h1 className={styles.title}>OLYMPUS PROTOCOL</h1>
+          <p className={styles.subtitle}>1v1 Online Simulator</p>
+
           <AnimatePresence mode="wait">
             {mode === 'idle' && (
               <motion.div key="idle" className={styles.buttons} {...modeMotion}>
@@ -179,6 +222,40 @@ export default function Menu() {
                     className="fancy-button fancy-button-sm"
                     onClick={() => setMode('idle')}
                     disabled={busy}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {mode === 'waiting' && waitingRoomId && (
+              <motion.div key="waiting" className={styles.form} {...modeMotion}>
+                <h2>Waiting for player 2…</h2>
+                <p className={styles.waitingHint}>Share this code:</p>
+                <div className={clsx('fancy-label', styles.codeLabel)}>
+                  <span className={clsx('fancy-label-text', styles.codeText)}>
+                    {waitingRoomId}
+                  </span>
+                </div>
+                <div className={styles.buttons}>
+                  <button
+                    className="fancy-button fancy-button-sm"
+                    onClick={handleCopyUrl}
+                  >
+                    {copied ? 'Copied!' : 'Share invite link'}
+                  </button>
+                </div>
+                <p className={styles.waitingHint}>
+                  Your opponent must open the URL or enter the code in &quot;Join&quot;.
+                  <br />
+                  <strong>Same browser test:</strong> open the URL in an incognito window
+                  (Ctrl+Shift+N).
+                </p>
+                <div className={styles.buttons}>
+                  <button
+                    className="fancy-button fancy-button-sm"
+                    onClick={handleCancelWaiting}
                   >
                     Cancel
                   </button>

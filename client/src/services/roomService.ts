@@ -10,7 +10,7 @@
 //   }
 // ============================================================================
 
-import { Game } from '@server/gameEngine';
+import { Game, normalizeSerializedState } from '@server/gameEngine';
 import type { GameConfig, PlayerId, SerializedGameState } from '@shared/types';
 import { get, off, onValue, ref, runTransaction, serverTimestamp, set } from 'firebase/database';
 import { db, sanitizeForFirebase, userPromise } from './firebase';
@@ -137,12 +137,27 @@ export function getMySeat(room: RoomData | null, userId: string): PlayerId | nul
 /**
  * Suscribe a cambios de la sala. Devuelve función de unsubscribe.
  * El callback recibe `null` si la sala no existe.
+ *
+ * Normaliza el snapshot antes de pasarlo al callback: Firebase RTDB elimina
+ * valores `null` y arrays vacíos al persistir, así que campos como
+ * `selection: {1: null, 2: null}` o `combatLog: []` desaparecen del JSON
+ * recibido. La normalización los rellena con defaults para que los
+ * consumidores no tengan que hacer defensive access en todas partes.
  */
 export function listenRoom(roomId: string, callback: (room: RoomData | null) => void): () => void {
   const roomRef = ref(db, `games/${roomId}`);
   const handler = (snap: { exists: () => boolean; val: () => unknown }): void => {
     if (snap.exists()) {
-      callback(snap.val() as RoomData);
+      const raw = snap.val() as RoomData;
+      const normalized: RoomData = {
+        ...raw,
+        seats: {
+          1: raw.seats?.[1] ?? null,
+          2: raw.seats?.[2] ?? null,
+        },
+        state: normalizeSerializedState(raw.state),
+      };
+      callback(normalized);
     } else {
       callback(null);
     }
@@ -160,9 +175,13 @@ export function getRoomIdFromURL(): string | null {
   return code ? code.toUpperCase() : null;
 }
 
-/** Construye una URL absoluta `?room=XYZ` (para copiar y compartir). */
+/** Construye una URL absoluta apuntando a la raíz con `?room=XYZ`.
+ *  El destinatario debe llegar al Menu para que la auth anónima cree su
+ *  propio usuario antes de unirse — si lo mandamos directo a /game/XYZ
+ *  recibe "you are not seated in this room" porque aún no se unió. */
 export function buildRoomURL(roomId: string): string {
   const url = new URL(window.location.href);
+  url.pathname = '/';
   url.searchParams.set('room', roomId);
   return url.toString();
 }

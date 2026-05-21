@@ -7,28 +7,25 @@
   padding: 32px;
 }
 
-.header {
-  text-align: center;
-  margin-bottom: 24px;
-}
-
 .title {
-  margin: 0;
+  margin: 8px 0 4px;
   font-family: 'Cinzel', 'Times New Roman', serif;
-  font-size: 42px;
+  font-size: 28px;
   letter-spacing: 0.12em;
   color: var(--gold);
   font-weight: 700;
+  text-align: center;
   text-shadow:
     2px 2px 4px rgba(0, 0, 0, 0.9),
     0 0 8px rgba(0, 0, 0, 0.8);
 }
 
 .subtitle {
-  margin: 8px 0 0;
+  margin: 0 0 24px;
   color: var(--text-dim);
   font-size: 14px;
   font-family: 'Cormorant Garamond', serif;
+  text-align: center;
 }
 
 .card {
@@ -84,8 +81,9 @@
 }
 
 .buttons button {
-  /* fancy-button + fancy-button-sm vienen como class via JSX */
-  flex: 1;
+  /* Sin flex:1 → cada botón se dimensiona a su contenido (texto + caps).
+     Botones con el mismo texto quedan igualados. */
+  flex: 0 0 auto;
 }
 
 .error {
@@ -94,6 +92,32 @@
   margin-top: 12px;
   font-size: 14px;
   font-family: 'Cormorant Garamond', serif;
+}
+
+/* ─── Estado waiting ──────────────────────────────────────── */
+.waitingHint {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+.codeLabel {
+  display: flex;
+  width: max-content;
+  margin: 0 auto;
+  /* Aumentamos el cap-w para que el código (6 chars) tenga aire */
+  --cap-w: 36px;
+  min-height: 44px;
+}
+
+.codeText {
+  font-family: 'Cinzel', serif;
+  font-size: 22px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.3em;
+  color: var(--gold);
 }
 
 /* Header decorativo (cresta) sobre el modal de menú */

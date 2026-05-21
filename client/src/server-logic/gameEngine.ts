@@ -535,3 +535,13 @@ function createPlayer(deck: Card[], vidaInicial: number): PlayerState {
 
 // Re-exports para que tests puedan importar tipos auxiliares.
 export type { PlayerSkill, UnitCard, SkillCard, PendingEffect };
+
+/**
+ * Normaliza un SerializedGameState potencialmente "corrupto" (Firebase RTDB
+ * elimina valores nulos y arrays vacíos al persistir, así que campos como
+ * `selection: {1: null, 2: null}` desaparecen). Hace un roundtrip por
+ * Game.fromSerialized().serialize() que rellena todos los defaults.
+ */
+export function normalizeSerializedState(data: SerializedGameState): SerializedGameState {
+  return Game.fromSerialized(data).serialize();
+}

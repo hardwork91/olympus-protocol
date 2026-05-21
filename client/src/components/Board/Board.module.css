@@ -1,18 +1,92 @@
 .app {
+  position: relative;
   display: grid;
   grid-template-columns: 1fr 340px;
   height: 100vh;
   gap: 12px;
   padding: 12px;
-  background: var(--bg-deep);
-  color: var(--text-light);
   overflow: hidden;
 }
 
 .main {
+  position: relative;
   display: grid;
   grid-template-rows: 1fr 1fr;
-  gap: 12px;
+  gap: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+/* ─── Cuando localSeat=2: invertimos el orden visual de los PlayerArea ───
+   (P2 abajo, P1 arriba) usando la propiedad order. */
+.app[data-local-seat='2'] .main > section:nth-child(1) {
+  order: 1;
+}
+.app[data-local-seat='2'] .main > section:nth-child(2) {
+  order: 2;
+}
+
+/* ─── Attack icon (centro) ────────────────────────────────────────── */
+.attackIcon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  /* z-index 1 para sobrevivir al order:1/2 cuando seat=2 invierte paint order */
+  z-index: 1;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.attackIcon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ─── Fly ornaments (laterales del centro) ────────────────────────── */
+.fly {
+  position: absolute;
+  top: 50%;
+  pointer-events: none;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fly img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.flyRight {
+  right: -13px;
+  transform: translateY(-50%);
+}
+.flyLeft {
+  left: -13px;
+  transform: translateY(-50%) scaleX(-1);
+}
+
+/* ─── Sider-header (cresta) sobre el sidebar ─────────────────────── */
+.sidebarDeco {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  width: 340px;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+.sidebarDeco img {
+  width: 352px;
+  height: auto;
+  display: block;
 }

@@ -1,36 +1,31 @@
+/* ──────────────────────────────────────────────────────────────────
+   Card — estilo Yu-Gi-Oh con frame.png overlay + cqi-based text scaling.
+   ────────────────────────────────────────────────────────────────── */
+
 .card {
+  /* Tamaño BASE (cartas en slots) — relación 5:7 aprox */
   width: 135px;
   height: 189px;
-  background: var(--bg-deep);
-  border: 2px solid #3a4a6b;
-  border-radius: 6px;
+  background: transparent;
+  border: none;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  cursor: pointer;
-  transition:
-    transform 0.15s,
-    box-shadow 0.15s,
-    border-color 0.15s;
+  position: relative;
+  overflow: hidden;
+  display: block;
   flex-shrink: 0;
+  container-type: inline-size;
+  border-radius: 0.5cqi;
   font-family: inherit;
   color: var(--text-light);
-  text-align: left;
-  overflow: hidden;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s;
 }
 
-.card:hover:not(:disabled) {
-  transform: translateY(-4px);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-}
-
-.card.notClickable {
-  cursor: default;
-}
-
-.card.notClickable:hover {
-  transform: none;
-  box-shadow: none;
+/* Cartas en la MANO: más grandes (proporción 5:7 ampliada) */
+.card.inHand {
+  width: 190px;
+  height: 266px;
 }
 
 .card.inSlot {
@@ -38,129 +33,142 @@
   height: 100%;
 }
 
-.card.selected {
-  box-shadow: 0 0 16px var(--gold) !important;
-  transform: translateY(-6px);
-  border-color: var(--gold) !important;
+.card.notClickable {
+  cursor: default;
 }
 
-.card.highlighted {
-  border-color: var(--gold);
-  box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+/* ─── Imagen de fondo (unidad) ────────────────────────────────────── */
+.bgImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  z-index: 1;
+  display: block;
+  pointer-events: none;
 }
 
-/* ─── Card back (dorso) ───────────────────────────────────────────────── */
-.cardBack {
-  background: linear-gradient(135deg, #2a3550 0%, #1a2235 100%);
-  border: 2px solid #3a4a6b;
-  align-items: center;
-  justify-content: center;
-}
-.backInner {
-  font-size: 56px;
-  color: var(--gold);
-  font-weight: bold;
-  opacity: 0.7;
-}
-
-/* ─── Unit vs Skill colors ──────────────────────────────────────────── */
-.card.unit {
-  background: linear-gradient(180deg, #1d2840 0%, #0d1424 100%);
-}
-.card.skill {
-  background: linear-gradient(180deg, #2a1a3a 0%, #14091e 100%);
-  border-color: var(--purple);
-}
-
-.subtype-assault .cardTop {
-  background: linear-gradient(90deg, #3a4a6b 0%, #c84a4a 100%);
-}
-.subtype-tank .cardTop {
-  background: linear-gradient(90deg, #3a4a6b 0%, #7a7a7a 100%);
-}
-.subtype-artillery .cardTop {
-  background: linear-gradient(90deg, #3a4a6b 0%, #c87a4a 100%);
-}
-.subtype-support .cardTop {
-  background: linear-gradient(90deg, #3a4a6b 0%, #5aa05a 100%);
-}
-.subtype-offensive .cardTop {
-  background: linear-gradient(90deg, #6b3a8c 0%, #d65a5a 100%);
-}
-.subtype-defensive .cardTop {
-  background: linear-gradient(90deg, #6b3a8c 0%, #5a6bd6 100%);
-}
-.subtype-trap .cardTop {
-  background: linear-gradient(90deg, #6b3a8c 0%, #9a3aca 100%);
-}
-
-/* ─── Skill states ───────────────────────────────────────────────────── */
-.skillActive {
-  box-shadow: 0 0 14px rgba(74, 222, 128, 0.6);
-}
-.skillConsumed {
-  filter: brightness(0.5) sepia(1) hue-rotate(-30deg);
-}
-
-/* ─── Estructura interna ────────────────────────────────────────────── */
-.cardTop {
-  padding: 3px 6px;
-  font-size: 9px;
-  font-weight: bold;
-  color: var(--text-light);
-  letter-spacing: 0.04em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-.cardName {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* ─── Frame overlay ───────────────────────────────────────────────── */
+.frameImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  pointer-events: none;
   display: block;
 }
 
-.cardBody {
-  flex: 1;
-  padding: 5px 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.fullImg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ─── Textos absolutos ─────────────────────────────────────────────
+   Posiciones basadas en frame.png (1347×1973) en %. */
+.frameName,
+.frameFp,
+.frameAr,
+.frameDesc {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  text-shadow:
+    2px 2px 4px rgba(0, 0, 0, 0.9),
+    0 0 3px rgba(0, 0, 0, 0.8);
+}
+
+.frameName {
+  left: 11%;
+  right: 11%;
+  top: 4.2%;
+  font-size: 8cqi;
+  letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-weight: 700;
+  color: #fbbf24;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.frameFp,
+.frameAr {
+  font-size: 10cqi;
+  font-family: 'Times New Roman', 'Georgia', serif;
+  font-weight: bold;
+  color: #c2b9aa;
+  line-height: 1;
+  transform: translate(-50%, -50%);
+}
+
+.frameFp {
+  left: 23.11%;
+  top: 69.2%;
+}
+
+.frameAr {
+  left: 81.63%;
+  top: 69.2%;
+}
+
+.frameDesc {
+  left: 11%;
+  right: 11%;
+  top: 76.9%;
+  font-size: 6cqi;
+  color: #321200;
+  font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+  font-weight: 700;
+  line-height: 1.1;
+  text-align: center;
+  text-shadow: none;
+  white-space: normal;
   overflow: hidden;
 }
 
-.cardSubtype {
-  font-size: 8px;
-  color: var(--gold);
-  font-weight: bold;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+/* En skills la descripción empieza más arriba (no hay FP/AR) */
+.skillDesc {
+  top: 67.5%;
 }
 
-.cardLore,
-.cardEffect {
-  font-size: 8px;
-  color: var(--text-dim);
-  line-height: 1.2;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 6;
-  -webkit-box-orient: vertical;
+/* ─── Estados de interacción ─────────────────────────────────────── */
+.card.inHand:hover:not(:disabled) {
+  transform: translateY(-6px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.4);
 }
 
-.cardBottom {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 6px;
-  background: rgba(0, 0, 0, 0.4);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+.card.notClickable:hover {
+  transform: none;
+  box-shadow: none;
 }
 
-.fp {
-  color: var(--red);
-  font-weight: bold;
-  font-size: 13px;
+.card.selected {
+  box-shadow: 0 0 14px var(--gold) !important;
+  transform: translateY(-6px);
 }
-.armor {
-  color: var(--green);
-  font-weight: bold;
-  font-size: 13px;
+
+.card.opponentSelected {
+  box-shadow: 0 0 14px var(--gold) !important;
+  transform: translateY(6px);
+}
+
+.card.highlighted {
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.6);
+}
+
+/* ─── Estados de skill ───────────────────────────────────────────── */
+.skillActive {
+  box-shadow: 0 0 16px rgba(74, 222, 128, 0.7);
+}
+.skillConsumed {
+  filter: brightness(0.5) sepia(1) hue-rotate(-30deg);
 }

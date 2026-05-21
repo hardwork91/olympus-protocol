@@ -1,8 +1,11 @@
-/* Global base styles. Variables del tema y reset mínimo. Los estilos
-   específicos (fancy-border, cards, etc.) llegan en la Fase 5. */
+/* ============================================================================
+   Estilos globales — paleta, fuentes, cursor, scrollbar, marble bg.
+   Las decoraciones por sprites (fancy-border, fancy-label, fancy-button) van
+   en sus propios CSS Modules de componente.
+   ============================================================================ */
 
 :root {
-  /* Paleta base — espejada del simulator vanilla */
+  /* ─── Paleta ───────────────────────────────────────────────── */
   --bg-deep: #0a0e1a;
   --bg-board: #1a2238;
   --bg-panel: #232b44;
@@ -12,7 +15,21 @@
   --gold-bright: #fcd34d;
   --green: #4ade80;
   --red: #f87171;
+  --amber: #fbbf24;
   --purple: #c084fc;
+  --unit-frame: #3a4a6b;
+  --skill-frame: #6b3a8c;
+  --subtype-assault: #c84a4a;
+  --subtype-tank: #7a7a7a;
+  --subtype-artillery: #c87a4a;
+  --subtype-support: #5aa05a;
+  --subtype-offensive: #d65a5a;
+  --subtype-defensive: #5a6bd6;
+  --subtype-trap: #9a3aca;
+
+  /* ─── Cursores custom (32×32, hotspot punta arriba-izquierda) ──── */
+  --cursor-arrow: url('/images/cursor-arrow.png') 2 2;
+  --cursor-pointer: url('/images/cursor-pointer.png') 2 2;
 }
 
 *,
@@ -22,19 +39,188 @@
 }
 
 html,
-body {
+body,
+#root {
+  height: 100%;
   margin: 0;
   padding: 0;
-  height: 100%;
-  background: var(--bg-deep);
-  color: var(--text-light);
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    sans-serif;
 }
 
-#root {
-  min-height: 100%;
+body {
+  /* Cormorant Garamond es la fuente secundaria (cuerpo de texto,
+     descripciones, stats). Cinzel se aplica por reglas específicas a
+     títulos/labels/nombres. */
+  font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+  background:
+    url('/images/marble.png') center / cover no-repeat fixed,
+    var(--bg-deep);
+  color: var(--text-light);
+  font-size: 13px;
+  overflow: hidden;
+  cursor: var(--cursor-arrow), auto;
+}
+
+/* Cursor pointer para elementos interactivos */
+button,
+[role='button'],
+a {
+  cursor: var(--cursor-pointer), pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* ─── Scrollbar global (webkit) ─────────────────────────────────────
+   - Track: línea dorada fina en el centro.
+   - Thumb: imagen scroll.png centrada.
+   ────────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-track:vertical {
+  background: linear-gradient(
+    to right,
+    transparent calc(50% - 1px),
+    var(--gold) calc(50% - 1px),
+    var(--gold) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+::-webkit-scrollbar-track:horizontal {
+  background: linear-gradient(
+    to bottom,
+    transparent calc(50% - 1px),
+    var(--gold) calc(50% - 1px),
+    var(--gold) calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+}
+::-webkit-scrollbar-thumb {
+  background: url('/images/scroll.png') center / 14px auto no-repeat;
+  border: none;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b16c00 transparent;
+}
+
+/* ─── Utility: fancy-border ─────────────────────────────────────────
+   Marco compuesto por corner.png (esquinas auto-rotadas por JS) +
+   border.png (lados tileados). El sprite final lo genera setupFancyBorder()
+   en runtime y se expone como var CSS --fancy-border-image.
+   El borde dibuja en un pseudo-elemento ::after que OVERLAY el elemento,
+   no afecta layout. `isolation: isolate` evita que los z-index internos
+   "escapen" al body.
+   ────────────────────────────────────────────────────────────────── */
+.fancy-border {
+  position: relative;
+  padding: 24px;
+  isolation: isolate;
+}
+.fancy-border::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: var(--fancy-border-size, 42px) solid transparent;
+  border-image-source: var(--fancy-border-image);
+  border-image-slice: 42;
+  border-image-width: var(--fancy-border-size, 42px);
+  border-image-outset: 0;
+  border-image-repeat: round;
+  pointer-events: none;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+/* ─── Utility: fancy-label ──────────────────────────────────────────
+   Etiqueta decorativa: start cap + center estirado + end cap.
+   Caps 1:1 (286×286 nativo) → ancho del cap = altura del contenedor.
+   ────────────────────────────────────────────────────────────────── */
+.fancy-label {
+  --cap-w: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 2px calc(var(--cap-w) + 10px);
+  background:
+    url('/images/label-start.png') left center / auto 100% no-repeat,
+    url('/images/label-end.png') right center / auto 100% no-repeat,
+    url('/images/label-center.png') calc(var(--cap-w) - 1px) center /
+      calc(100% - 2 * var(--cap-w) + 2px) 100% no-repeat;
+}
+
+.fancy-label-text {
+  color: #fbbf24;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-size: 14px;
+  font-weight: normal;
+  letter-spacing: 0.12em;
+  text-shadow:
+    2px 2px 4px rgba(0, 0, 0, 0.9),
+    0 0 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+/* ─── Utility: fancy-button ─────────────────────────────────────────
+   Botón decorativo con sprites button-*.png. Hover: drop-shadow dorado.
+   Active: ligero scale 0.94. Disabled: grayscale.
+   ────────────────────────────────────────────────────────────────── */
+.fancy-button {
+  --cap-w: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 4px calc(var(--cap-w) + 14px);
+  background:
+    url('/images/button-start.png') left center / auto 100% no-repeat,
+    url('/images/button-end.png') right center / auto 100% no-repeat,
+    url('/images/button-center.png') calc(var(--cap-w) - 1px) center /
+      calc(100% - 2 * var(--cap-w) + 2px) 100% no-repeat;
+  border: none;
+  appearance: none;
+  color: #fbbf24;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-shadow:
+    2px 2px 4px rgba(0, 0, 0, 0.9),
+    0 0 3px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+  transition:
+    filter 0.15s ease,
+    transform 0.08s ease;
+}
+.fancy-button:hover:not(:disabled) {
+  filter: drop-shadow(0 0 5px var(--gold));
+}
+.fancy-button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.fancy-button:disabled {
+  filter: grayscale(0.6) brightness(0.7);
+  cursor: not-allowed;
+}
+
+/* Variante secundaria compacta (action-bar, modales) */
+.fancy-button-sm {
+  --cap-w: 32px;
+  min-height: 32px;
+  padding: 2px calc(var(--cap-w) + 8px);
+  font-size: 14px;
 }

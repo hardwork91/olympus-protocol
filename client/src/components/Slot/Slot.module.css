@@ -1,13 +1,23 @@
 .slot {
   width: 144px;
   height: 202px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 2px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  border: none;
   border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  overflow: hidden;
+  position: relative;
+}
+
+.slot.empty {
+  /* Imagen tenue de "slot" para que no se vea vacío */
+  background:
+    url('/images/slot.png') center / contain no-repeat,
+    rgba(0, 0, 0, 0.25);
+  opacity: 0.8;
 }
 
 .slot.empty .label {
@@ -16,14 +26,19 @@
   font-weight: bold;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+  font-family: 'Cinzel', serif;
+  position: absolute;
+  bottom: 8px;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 .slot.highlighted {
-  border: 2px solid var(--gold);
-  box-shadow: 0 0 12px rgba(251, 191, 36, 0.5);
-  background: rgba(251, 191, 36, 0.08);
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.5);
+  background-color: rgba(251, 191, 36, 0.08);
 }
 
 .slot.clickable {
-  cursor: pointer;
+  cursor: var(--cursor-pointer), pointer;
 }

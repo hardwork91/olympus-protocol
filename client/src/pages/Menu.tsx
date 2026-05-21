@@ -9,6 +9,7 @@
 
 import { useUser } from '@hooks/useUser';
 import { createRoom, getRoomIdFromURL, joinRoom } from '@services/roomService';
+import clsx from 'clsx';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styles from './Menu.module.css';
@@ -79,78 +80,105 @@ export default function Menu() {
         <p className={styles.subtitle}>1v1 Online Simulator · Phase 3</p>
       </header>
 
-      <div className={styles.card}>
-        {mode === 'idle' && (
-          <div className={styles.buttons}>
-            <button onClick={() => setMode('creating')} disabled={busy}>
-              Create new game
-            </button>
-            <button onClick={() => setMode('joining')} disabled={busy}>
-              Join with code
-            </button>
-          </div>
-        )}
-
-        {mode === 'creating' && (
-          <div className={styles.form}>
-            <h2>Create game</h2>
-            <label>
-              Starting life (10–50):
-              <input
-                type="number"
-                min={10}
-                max={50}
-                value={vida}
-                onChange={(e) => setVida(parseInt(e.target.value, 10))}
-              />
-            </label>
-            <label>
-              Max turns (10–40):
-              <input
-                type="number"
-                min={10}
-                max={40}
-                value={turnos}
-                onChange={(e) => setTurnos(parseInt(e.target.value, 10))}
-              />
-            </label>
+      <div className={styles.cardWrapper}>
+        <div className={styles.cardDeco} />
+        <div className={clsx(styles.card, 'fancy-border')}>
+          {mode === 'idle' && (
             <div className={styles.buttons}>
-              <button onClick={handleCreate} disabled={busy}>
-                {busy ? 'Creating…' : 'Create'}
+              <button
+                className="fancy-button fancy-button-sm"
+                onClick={() => setMode('creating')}
+                disabled={busy}
+              >
+                Create
               </button>
-              <button onClick={() => setMode('idle')} disabled={busy}>
-                Cancel
+              <button
+                className="fancy-button fancy-button-sm"
+                onClick={() => setMode('joining')}
+                disabled={busy}
+              >
+                Join
               </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {mode === 'joining' && (
-          <div className={styles.form}>
-            <h2>Join game</h2>
-            <label>
-              Room code (6 characters):
-              <input
-                type="text"
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
-                placeholder="ABC123"
-                style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}
-              />
-            </label>
-            <div className={styles.buttons}>
-              <button onClick={handleJoin} disabled={busy}>
-                {busy ? 'Joining…' : 'Join'}
-              </button>
-              <button onClick={() => setMode('idle')} disabled={busy}>
-                Cancel
-              </button>
+          {mode === 'creating' && (
+            <div className={styles.form}>
+              <h2>Create game</h2>
+              <label>
+                Starting life (10–50):
+                <input
+                  type="number"
+                  min={10}
+                  max={50}
+                  value={vida}
+                  onChange={(e) => setVida(parseInt(e.target.value, 10))}
+                />
+              </label>
+              <label>
+                Max turns (10–40):
+                <input
+                  type="number"
+                  min={10}
+                  max={40}
+                  value={turnos}
+                  onChange={(e) => setTurnos(parseInt(e.target.value, 10))}
+                />
+              </label>
+              <div className={styles.buttons}>
+                <button
+                  className="fancy-button fancy-button-sm"
+                  onClick={handleCreate}
+                  disabled={busy}
+                >
+                  {busy ? 'Creating…' : 'Create'}
+                </button>
+                <button
+                  className="fancy-button fancy-button-sm"
+                  onClick={() => setMode('idle')}
+                  disabled={busy}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {error && <p className={styles.error}>{error}</p>}
+          {mode === 'joining' && (
+            <div className={styles.form}>
+              <h2>Join game</h2>
+              <label>
+                Room code (6 characters):
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.toUpperCase())}
+                  placeholder="ABC123"
+                  style={{ textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                />
+              </label>
+              <div className={styles.buttons}>
+                <button
+                  className="fancy-button fancy-button-sm"
+                  onClick={handleJoin}
+                  disabled={busy}
+                >
+                  {busy ? 'Joining…' : 'Join'}
+                </button>
+                <button
+                  className="fancy-button fancy-button-sm"
+                  onClick={() => setMode('idle')}
+                  disabled={busy}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {error && <p className={styles.error}>{error}</p>}
+        </div>
       </div>
     </div>
   );

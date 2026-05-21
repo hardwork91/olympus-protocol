@@ -59,7 +59,12 @@ export default function PlayerArea({
 
   return (
     <section
-      className={clsx(styles.area, styles[`orient-${orientation}`], isActive && styles.active)}
+      className={clsx(
+        styles.area,
+        'fancy-border',
+        styles[`orient-${orientation}`],
+        isActive && styles.active,
+      )}
     >
       <div className={styles.slotsGrid}>
         <Slot

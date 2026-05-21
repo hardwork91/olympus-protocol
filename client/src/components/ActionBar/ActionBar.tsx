@@ -8,6 +8,7 @@ import { Game } from '@server/gameEngine';
 import * as gameService from '@services/gameService';
 import type { PlayerId, SerializedGameState } from '@shared/types';
 import { useUIStore } from '@store/uiStore';
+import clsx from 'clsx';
 import styles from './ActionBar.module.css';
 
 interface ActionBarProps {
@@ -16,13 +17,14 @@ interface ActionBarProps {
   localSeat: PlayerId;
 }
 
+const btnCls = 'fancy-button fancy-button-sm';
+
 export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) {
   const setErrorMessage = useUIStore((s) => s.setErrorMessage);
   const isAnimating = useUIStore((s) => s.isAnimating);
   const setIsAnimating = useUIStore((s) => s.setIsAnimating);
   const setSelectedInstanceId = useUIStore((s) => s.setSelectedInstanceId);
 
-  // Helper: ejecuta una acción del service con manejo de errores uniforme.
   const run = async (fn: () => Promise<unknown>): Promise<void> => {
     try {
       await fn();
@@ -31,8 +33,6 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
     }
   };
 
-  // Reconstruimos un Game local para llamar a los métodos de inspección
-  // (canDeclareMulligan, canReplaceSkill, etc.). NO mutamos — solo lectura.
   const game = Game.fromSerialized(state);
 
   // ─── Fase setup ──────────────────────────────────────────────────────
@@ -54,14 +54,14 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
           <div className={styles.buttons}>
             {game.canDeclareMulligan(localSeat) && (
               <button
-                className={styles.btnSecondary}
+                className={btnCls}
                 onClick={() => run(() => gameService.declareMulligan(roomId, localSeat))}
               >
-                Declare Mulligan
+                Mulligan
               </button>
             )}
             <button
-              className={styles.btnPrimary}
+              className={btnCls}
               onClick={() => run(() => gameService.confirmHand(roomId, localSeat))}
             >
               Confirm hand
@@ -75,15 +75,17 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
       return (
         <div className={styles.bar}>
           <div className={styles.status}>Setup · Place units & skill</div>
-          <button
-            className={styles.btnPrimary}
-            onClick={() => {
-              setSelectedInstanceId(null);
-              run(() => gameService.finishSetup(roomId, localSeat));
-            }}
-          >
-            Finish setup
-          </button>
+          <div className={styles.buttons}>
+            <button
+              className={btnCls}
+              onClick={() => {
+                setSelectedInstanceId(null);
+                run(() => gameService.finishSetup(roomId, localSeat));
+              }}
+            >
+              Finish setup
+            </button>
+          </div>
         </div>
       );
     }
@@ -115,7 +117,7 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
         <div className={styles.buttons}>
           {!drawn && canReplace && !isReplacing && (
             <button
-              className={styles.btnSecondary}
+              className={btnCls}
               onClick={() => run(() => gameService.enterReplaceSkillMode(roomId, localSeat))}
             >
               Replace Skill
@@ -123,7 +125,7 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
           )}
           {isReplacing && (
             <button
-              className={styles.btnSecondary}
+              className={btnCls}
               onClick={() => {
                 setSelectedInstanceId(null);
                 run(() => gameService.exitReplaceSkillMode(roomId, localSeat));
@@ -134,7 +136,7 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
           )}
           {!drawn && (
             <button
-              className={styles.btnSecondary}
+              className={btnCls}
               onClick={() => run(() => gameService.drawPhase(roomId, localSeat))}
             >
               Draw
@@ -146,18 +148,20 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
           <div className={styles.warn}>⚠ Fill empty slots with units from your hand.</div>
         )}
 
-        <button
-          className={styles.btnEndTurn}
-          disabled={!canEnd || isAnimating}
-          onClick={async () => {
-            setIsAnimating(true);
-            setSelectedInstanceId(null);
-            await run(() => gameService.endTurn(roomId, localSeat));
-            setIsAnimating(false);
-          }}
-        >
-          {isAnimating ? 'Resolving…' : 'End turn'}
-        </button>
+        <div className={styles.buttons}>
+          <button
+            className={clsx(btnCls)}
+            disabled={!canEnd || isAnimating}
+            onClick={async () => {
+              setIsAnimating(true);
+              setSelectedInstanceId(null);
+              await run(() => gameService.endTurn(roomId, localSeat));
+              setIsAnimating(false);
+            }}
+          >
+            {isAnimating ? 'Resolving…' : 'End turn'}
+          </button>
+        </div>
       </div>
     );
   }
@@ -168,12 +172,11 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
       <div className={styles.gameOver}>
         Game over
         {state.gameOver && (
-          <span>
-            {' · '}
+          <div style={{ marginTop: 6, fontSize: 13 }}>
             {state.gameOver.reason === 'draw'
               ? 'Draw'
               : `Player ${state.gameOver.winner} wins (${state.gameOver.reason})`}
-          </span>
+          </div>
         )}
       </div>
     </div>

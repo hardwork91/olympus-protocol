@@ -1,31 +1,33 @@
 .bar {
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid #3a4a6b;
+  background: rgba(0, 0, 0, 0.35);
+  border: none;
   border-radius: 6px;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
 }
 
 .status {
   color: var(--gold);
   font-weight: bold;
-  font-size: 13px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 14px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--bg-deep);
 }
 
 .waiting {
   color: var(--text-dim);
-  font-size: 13px;
+  font-size: 14px;
   text-align: center;
   padding: 8px;
 }
 
 .warn {
   color: var(--red);
-  font-size: 12px;
+  font-size: 14px;
   padding: 4px 0;
 }
 
@@ -35,54 +37,12 @@
   font-size: 14px;
   text-align: center;
   padding: 8px;
+  font-family: 'Cinzel', serif;
 }
 
 .buttons {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.btnPrimary,
-.btnSecondary,
-.btnEndTurn {
-  padding: 8px 14px;
-  border: none;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.15s;
-  font-family: inherit;
-}
-
-.btnPrimary {
-  background: var(--green);
-  color: var(--bg-deep);
-}
-.btnPrimary:hover:not(:disabled) {
-  filter: brightness(1.15);
-}
-
-.btnSecondary {
-  background: transparent;
-  color: var(--text-light);
-  border: 1px solid #3a4a6b;
-}
-.btnSecondary:hover:not(:disabled) {
-  background: #3a4a6b;
-}
-
-.btnEndTurn {
-  background: var(--gold);
-  color: var(--bg-deep);
-  font-size: 14px;
-  padding: 10px 16px;
-}
-.btnEndTurn:hover:not(:disabled) {
-  background: var(--gold-bright);
-}
-.btnEndTurn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  justify-content: center;
 }

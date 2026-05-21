@@ -1,9 +1,10 @@
 // ============================================================================
 // Card — renderiza una carta (unidad o skill).
-// Variantes:
-//   - inHand: tamaño completo, clickeable, muestra info
-//   - inSlot: ocupa el slot, no clickeable directamente
-//   - faceDown: dorso opaco (mano del rival, skill hidden, etc.)
+// Diseño estilo Yu-Gi-Oh con frame.png overlay:
+//   - Capa 1 (z=1): imagen de la unidad/skill como fondo (object-fit: cover)
+//   - Capa 2 (z=2): frame.png o skill-frame.png como overlay decorativo
+//   - Capa 3 (z=3): textos absolutamente posicionados (nombre, FP, AR, lore)
+// El tamaño usa container-type: inline-size para que los textos escalen con cqi.
 // ============================================================================
 
 import type { Card as CardType } from '@shared/types';
@@ -15,9 +16,10 @@ interface CardProps {
   faceDown?: boolean;
   selected?: boolean;
   highlighted?: boolean;
+  /** Halo dorado tipo "selección del rival" — mismo color, animación distinta. */
+  opponentSelected?: boolean;
   onClick?: () => void;
   variant?: 'inHand' | 'inSlot';
-  /** Skill state ('hidden', 'active', 'consumed') si aplica. */
   skillState?: 'hidden' | 'active' | 'consumed';
 }
 
@@ -26,69 +28,60 @@ export default function Card({
   faceDown,
   selected,
   highlighted,
+  opponentSelected,
   onClick,
   variant = 'inHand',
   skillState,
 }: CardProps) {
+  const className = clsx(
+    styles.card,
+    variant === 'inSlot' && styles.inSlot,
+    variant === 'inHand' && styles.inHand,
+    selected && styles.selected,
+    opponentSelected && styles.opponentSelected,
+    highlighted && styles.highlighted,
+    skillState === 'active' && styles.skillActive,
+    skillState === 'consumed' && styles.skillConsumed,
+    !onClick && styles.notClickable,
+  );
+
   if (faceDown || !card) {
     return (
       <button
         type="button"
         onClick={onClick}
-        className={clsx(
-          styles.card,
-          styles.cardBack,
-          variant === 'inSlot' && styles.inSlot,
-          selected && styles.selected,
-          highlighted && styles.highlighted,
-          !onClick && styles.notClickable,
-        )}
         disabled={!onClick}
+        className={clsx(className, styles.cardBack)}
       >
-        <div className={styles.backInner}>?</div>
+        <img src="/images/back.png" alt="Card back" className={styles.fullImg} />
       </button>
     );
   }
 
   const isUnit = card.type === 'unit';
+  const framePath = isUnit ? '/images/frame.png' : '/images/skill-frame.png';
 
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={!onClick}
-      className={clsx(
-        styles.card,
-        isUnit ? styles.unit : styles.skill,
-        styles[`subtype-${card.subtype.toLowerCase()}`],
-        variant === 'inSlot' && styles.inSlot,
-        selected && styles.selected,
-        highlighted && styles.highlighted,
-        skillState === 'active' && styles.skillActive,
-        skillState === 'consumed' && styles.skillConsumed,
-        !onClick && styles.notClickable,
-      )}
+      className={clsx(className, isUnit ? styles.unit : styles.skill)}
     >
-      <header className={styles.cardTop}>
-        <span className={styles.cardName}>
-          #{card.id} {card.name}
-        </span>
-      </header>
-
-      <div className={styles.cardBody}>
-        <div className={styles.cardSubtype}>{card.subtype}</div>
-        {isUnit ? (
-          <div className={styles.cardLore}>{card.lore ?? ''}</div>
-        ) : (
-          <div className={styles.cardEffect}>{card.effect}</div>
-        )}
-      </div>
-
-      {isUnit && (
-        <footer className={styles.cardBottom}>
-          <span className={styles.fp}>⚔ {card.firepower}</span>
-          <span className={styles.armor}>🛡 {card.armor}</span>
-        </footer>
+      {/* Capa 1: imagen de la unidad/skill */}
+      {card.image && <img src={`/${card.image}`} alt={card.name} className={styles.bgImg} />}
+      {/* Capa 2: frame decorativo */}
+      <img src={framePath} alt="" aria-hidden="true" className={styles.frameImg} />
+      {/* Capa 3: textos */}
+      <div className={styles.frameName}>{card.name}</div>
+      {isUnit ? (
+        <>
+          <div className={styles.frameFp}>{card.firepower}</div>
+          <div className={styles.frameAr}>{card.armor}</div>
+          {card.lore && <div className={styles.frameDesc}>{card.lore}</div>}
+        </>
+      ) : (
+        <div className={clsx(styles.frameDesc, styles.skillDesc)}>{card.effect}</div>
       )}
     </button>
   );

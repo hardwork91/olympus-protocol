@@ -1,18 +1,12 @@
 .area {
+  /* fancy-border ya añade position:relative, padding:24px, isolation */
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 12px;
-  padding: 12px;
-  background: rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: transparent;
   border-radius: 8px;
   min-height: 0;
   overflow: hidden;
-  transition: border-color 0.3s;
-}
-
-.area.active {
-  border-color: rgba(251, 191, 36, 0.4);
 }
 
 .slotsGrid {
@@ -25,28 +19,28 @@
 
 /* Orientación TOP: rearGuard + info arriba, frontLine + skill abajo */
 .area.orient-top .slotsGrid > :nth-child(1) {
-  grid-area: 1 / 1; /* rearGuard */
+  grid-area: 1 / 1;
 }
 .area.orient-top .slotsGrid > :nth-child(2) {
-  grid-area: 1 / 2; /* info */
+  grid-area: 1 / 2;
 }
 .area.orient-top .slotsGrid > :nth-child(3) {
-  grid-area: 2 / 1; /* frontLine */
+  grid-area: 2 / 1;
 }
 .area.orient-top .slotsGrid > :nth-child(4) {
-  grid-area: 2 / 2; /* skill */
+  grid-area: 2 / 2;
 }
 
 /* Orientación BOTTOM: frontLine + skill arriba, rearGuard + info abajo */
 .area.orient-bottom .slotsGrid > :nth-child(1) {
-  grid-area: 2 / 1; /* rearGuard */
+  grid-area: 2 / 1;
 }
 .area.orient-bottom .slotsGrid > :nth-child(2) {
-  grid-area: 2 / 2; /* info */
+  grid-area: 2 / 2;
 }
 .area.orient-bottom .slotsGrid > :nth-child(3) {
-  grid-area: 1 / 1; /* frontLine */
+  grid-area: 1 / 1;
 }
 .area.orient-bottom .slotsGrid > :nth-child(4) {
-  grid-area: 1 / 2; /* skill */
+  grid-area: 1 / 2;
 }

@@ -5,43 +5,49 @@
   align-items: center;
   justify-content: center;
   padding: 32px;
-  background: var(--bg-deep);
-  color: var(--text-light);
 }
 
 .header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .title {
   margin: 0;
-  font-size: 36px;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-size: 42px;
   letter-spacing: 0.12em;
   color: var(--gold);
+  font-weight: 700;
+  text-shadow:
+    2px 2px 4px rgba(0, 0, 0, 0.9),
+    0 0 8px rgba(0, 0, 0, 0.8);
 }
 
 .subtitle {
   margin: 8px 0 0;
   color: var(--text-dim);
   font-size: 14px;
+  font-family: 'Cormorant Garamond', serif;
 }
 
 .card {
-  background: var(--bg-board);
-  border: 1px solid var(--gold);
-  border-radius: 8px;
-  padding: 32px;
+  /* fancy-border en HTML añade padding 24px + sprite */
+  background: url('/images/marble.png') center / cover no-repeat;
+  border: none;
+  border-radius: 48px;
   min-width: 360px;
   max-width: 500px;
 }
 
 .card h2 {
-  margin: 0 0 20px;
+  margin: -12px 0 12px;
   color: var(--gold);
   text-align: center;
   font-size: 22px;
   letter-spacing: 0.08em;
+  font-family: 'Cinzel', 'Times New Roman', serif;
+  font-weight: 700;
 }
 
 .form {
@@ -54,44 +60,32 @@
   display: block;
   color: var(--text-light);
   font-size: 14px;
+  margin: 8px 0;
+  font-family: 'Cormorant Garamond', serif;
 }
 
 .form input {
   width: 100%;
-  padding: 8px 10px;
+  padding: 6px 10px;
   margin-top: 6px;
   background: var(--bg-deep);
   color: var(--text-light);
-  border: 1px solid #3a4a6b;
+  border: 1px solid var(--unit-frame);
   border-radius: 4px;
   font-size: 14px;
+  font-family: inherit;
 }
 
 .buttons {
   display: flex;
   gap: 12px;
   margin-top: 16px;
+  justify-content: center;
 }
 
 .buttons button {
+  /* fancy-button + fancy-button-sm vienen como class via JSX */
   flex: 1;
-  padding: 10px 16px;
-  background: var(--gold);
-  color: var(--bg-deep);
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: bold;
-  cursor: pointer;
-}
-
-.buttons button:hover:not(:disabled) {
-  background: var(--gold-bright);
-}
-
-.buttons button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .error {
@@ -99,4 +93,21 @@
   text-align: center;
   margin-top: 12px;
   font-size: 14px;
+  font-family: 'Cormorant Garamond', serif;
+}
+
+/* Header decorativo (cresta) sobre el modal de menú */
+.cardWrapper {
+  position: relative;
+}
+.cardDeco {
+  position: absolute;
+  left: 50%;
+  top: -32px;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  aspect-ratio: 948 / 364;
+  background: url('/images/header.png') center / contain no-repeat;
+  z-index: 20;
+  pointer-events: none;
 }

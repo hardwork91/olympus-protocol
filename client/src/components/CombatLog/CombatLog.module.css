@@ -1,11 +1,11 @@
 .log {
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid #3a4a6b;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--bg-panel);
   border-radius: 6px;
   padding: 8px 12px;
   overflow-y: auto;
-  font-family: 'Consolas', monospace;
-  font-size: 12px;
+  font-family: 'Cormorant Garamond', 'Georgia', 'Times New Roman', serif;
+  font-size: 14px;
   line-height: 1.4;
   flex: 1;
   min-height: 100px;
@@ -15,7 +15,7 @@
 .empty {
   color: var(--text-dim);
   font-style: italic;
-  font-size: 11px;
+  font-size: 13px;
   padding: 8px 0;
   text-align: center;
 }
@@ -30,5 +30,6 @@
   font-weight: bold;
   margin-right: 6px;
   display: inline-block;
-  min-width: 30px;
+  min-width: 32px;
+  font-family: 'Cinzel', serif;
 }

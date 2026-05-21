@@ -16,6 +16,7 @@ import * as gameService from '@services/gameService';
 import type { PlayerId, SerializedGameState, SlotIndicator } from '@shared/types';
 import { otherPlayer } from '@shared/types';
 import { useUIStore } from '@store/uiStore';
+import clsx from 'clsx';
 import styles from './Board.module.css';
 
 interface BoardProps {
@@ -94,7 +95,7 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
       : state.activePlayer === bottomId;
 
   return (
-    <div className={styles.app}>
+    <div className={styles.app} data-local-seat={localSeat}>
       <main className={styles.main}>
         <PlayerArea
           playerId={topId}
@@ -124,9 +125,28 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
           onSlotClick={handleSlotClick}
           orientation="bottom"
         />
+
+        {/* Decoraciones flotantes (no interactivas) — última pos en DOM →
+            pintan encima por orden de documento. */}
+        <div className={styles.attackIcon} aria-hidden="true">
+          <img src="/images/attack-icon.png" alt="" />
+        </div>
+        <div className={clsx(styles.fly, styles.flyRight)} aria-hidden="true">
+          <img src="/images/fly.png" alt="" />
+        </div>
+        <div className={clsx(styles.fly, styles.flyLeft)} aria-hidden="true">
+          <img src="/images/fly.png" alt="" />
+        </div>
       </main>
 
       <Sidebar roomId={roomId} state={state} localSeat={localSeat} />
+
+      {/* Sider-header (cresta) sobrepuesto en la columna del sidebar.
+          Va como hijo de .app (no del sidebar) para no ser recortado por
+          el overflow:hidden del sidebar. */}
+      <div className={styles.sidebarDeco} aria-hidden="true">
+        <img src="/images/sider-header.png" alt="" />
+      </div>
     </div>
   );
 }

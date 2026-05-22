@@ -13,7 +13,13 @@
 // ============================================================================
 
 import { Game } from '@server/gameEngine';
-import type { PlayerId, SerializedGameState, SlotIndicator } from '@shared/types';
+import type {
+  AttackTarget,
+  PlayerId,
+  SerializedGameState,
+  SlotRef,
+  UnitSlotIndex,
+} from '@shared/types';
 import { ref, runTransaction, set } from 'firebase/database';
 import { db, sanitizeForFirebase } from './firebase';
 
@@ -75,9 +81,26 @@ export async function placeCard(
   roomId: string,
   playerId: PlayerId,
   instanceId: string,
-  slot: SlotIndicator,
+  slot: SlotRef,
 ): Promise<SerializedGameState> {
   return mutateGameState(roomId, (g) => g.placeCard(playerId, instanceId, slot), 'placeCard');
+}
+
+/** Declarar un ataque individual (1 atacante → 1 víctima o vida). */
+export async function declareAttack(
+  roomId: string,
+  playerId: PlayerId,
+  attackerSlot: UnitSlotIndex,
+  target: AttackTarget,
+): Promise<SerializedGameState> {
+  return mutateGameState(
+    roomId,
+    (g) => {
+      const result = g.declareAttack(playerId, attackerSlot, target);
+      return result !== null;
+    },
+    'declareAttack',
+  );
 }
 
 export async function enterReplaceSkillMode(
@@ -111,8 +134,9 @@ export async function endTurn(roomId: string, playerId: PlayerId): Promise<Seria
     roomId,
     (g) => {
       if (g.activePlayer !== playerId) return false;
-      const result = g.endTurn();
-      return result !== null;
+      if (!g.canEndTurn(playerId)) return false;
+      g.endTurn();
+      return true;
     },
     'endTurn',
   );

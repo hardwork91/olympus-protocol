@@ -15,6 +15,8 @@ interface UnitTemplate {
   copies: number;
   image: string;
   lore: string;
+  /** Ability text para cartas Support (no atacan, dan utility). Otras unidades: undefined. */
+  ability?: string;
 }
 
 interface SkillTemplate {
@@ -120,31 +122,34 @@ export const UNITS: readonly UnitTemplate[] = [
     id: 10,
     name: 'HERM35',
     subtype: 'Support',
-    firepower: 3,
+    firepower: 0, // Support no ataca
     armor: 5,
     copies: 3,
     image: 'images/10-hermes.png',
-    lore: 'Winged messenger, swift to flank and support his allies.',
+    lore: 'Adjacent allies gain +1 Firepower.',
+    ability: 'Adjacent allies gain +1 Firepower.',
   },
   {
     id: 11,
     name: 'ATH3N4',
     subtype: 'Support',
-    firepower: 4,
+    firepower: 0,
     armor: 5,
     copies: 3,
     image: 'images/11-athena.png',
-    lore: 'Strategist of war, her shield and spear command the line.',
+    lore: 'Adjacent allies gain +2 Armor.',
+    ability: 'Adjacent allies gain +2 Armor.',
   },
   {
     id: 12,
     name: 'HEPH435TUS',
     subtype: 'Support',
-    firepower: 2,
+    firepower: 0,
     armor: 6,
     copies: 3,
     image: 'images/12-hephaestus.png',
-    lore: 'Smith of the gods, forging armor and weapons mid-battle.',
+    lore: 'Taunt — enemies in reach must target this unit if possible.',
+    ability: 'Taunt — enemies in reach must target this unit if possible.',
   },
 ];
 
@@ -153,7 +158,7 @@ export const SKILLS: readonly SkillTemplate[] = [
     id: 13,
     name: 'OVERLOAD',
     subtype: 'Offensive',
-    effect: 'Your Front Line gains +3 Firepower this turn.',
+    effect: 'Your units gain +3 Firepower for attacks this turn.',
     image: 'images/13-reactor-overload.png',
   },
   {
@@ -161,7 +166,7 @@ export const SKILLS: readonly SkillTemplate[] = [
     name: 'EMP-PULSE',
     subtype: 'Offensive',
     effect:
-      'If your Front Line destroys the rival Front Line, the excess penetrates directly to rival life (ignores Rear Guard Armor).',
+      'Your attacks ignore the targets\' Armor this turn. Full Firepower lands as damage.',
     image: 'images/14-emp-pulse.png',
   },
   {
@@ -169,7 +174,7 @@ export const SKILLS: readonly SkillTemplate[] = [
     name: 'TGT-OVERRIDE',
     subtype: 'Offensive',
     effect:
-      'Your Front Line auto-destroys the rival Front Line regardless of Armor. No excess generated. Your Front Line survives intact.',
+      'Your next attack auto-destroys the target unit regardless of Armor. No excess generated. Your attacker survives.',
     image: 'images/15-targeting-override.png',
   },
   {
@@ -177,7 +182,7 @@ export const SKILLS: readonly SkillTemplate[] = [
     name: 'DOUBLE-SHOT',
     subtype: 'Offensive',
     effect:
-      'Your Front Line attacks twice this turn. The second attack uses original Firepower, no excess from the first.',
+      '+1 attack this turn. You can divide attacks between different units freely.',
     image: 'images/16-double-shot.png',
   },
   {
@@ -185,14 +190,14 @@ export const SKILLS: readonly SkillTemplate[] = [
     name: 'ENERGY-SHLD',
     subtype: 'Defensive',
     effect:
-      'Your life takes no damage this turn. Cards may be destroyed, but residual life damage is fully blocked.',
+      'Your life takes no damage from the next enemy attack. Units may still be destroyed.',
     image: 'images/17-energy-shield.png',
   },
   {
     id: 18,
     name: 'REINFORCED',
     subtype: 'Defensive',
-    effect: 'Your Front Line and Rear Guard gain +2 Armor during the rival attack.',
+    effect: 'All your units gain +2 Armor against the rival attacks this turn.',
     image: 'images/18-reinforcement-protocol.png',
   },
   {
@@ -200,7 +205,7 @@ export const SKILLS: readonly SkillTemplate[] = [
     name: 'REPULSORS',
     subtype: 'Defensive',
     effect:
-      'Your Rear Guard is invulnerable this turn. Excess hitting it is nullified. Life remains vulnerable to other damage vectors.',
+      'Your units cannot be destroyed this turn — attacks against them are nullified. Life damage from direct line still applies.',
     image: 'images/19-emergency-repulsors.png',
   },
   {
@@ -208,7 +213,7 @@ export const SKILLS: readonly SkillTemplate[] = [
     name: 'MINEFIELD',
     subtype: 'Trap',
     effect:
-      'Activates when the rival destroys your Front Line. The attacker card is also destroyed. Excess heading to Rear Guard is nullified.',
+      'Activates when the rival destroys one of your units. The attacker card is also destroyed. Excess to life is still applied.',
     image: 'images/20-minefield.png',
   },
   {
@@ -216,7 +221,7 @@ export const SKILLS: readonly SkillTemplate[] = [
     name: 'CYBERATTACK',
     subtype: 'Trap',
     effect:
-      'Activates when a rival trap meets its activation condition. Cancels the rival trap effect before it applies. Both cards are discarded.',
+      'Activates when a rival trap would trigger during your attack. Cancels the rival trap and both cards are discarded.',
     image: 'images/21-cyberattack.png',
   },
   {
@@ -224,7 +229,7 @@ export const SKILLS: readonly SkillTemplate[] = [
     name: 'TRAP-CHARGE',
     subtype: 'Trap',
     effect:
-      'Activates the first time your Front Line survives a rival attack. Your Front Line gains +5 Firepower on your next attack. If your Front Line is empty then, the bonus is lost.',
+      'Activates the first time one of your units survives an enemy attack. Your next attack gains +5 Firepower.',
     image: 'images/22-trap-charge.png',
   },
 ];
@@ -261,6 +266,7 @@ export function buildDeck(): Card[] {
         armor: unit.armor,
         image: unit.image,
         lore: unit.lore,
+        ...(unit.ability !== undefined ? { ability: unit.ability } : {}),
       };
       deck.push(card);
     }

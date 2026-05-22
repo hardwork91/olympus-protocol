@@ -1,13 +1,16 @@
 // ============================================================================
-// PlayerArea — orquesta los 3 slots + info + hand de un jugador.
-// Layout: grid 2x2 con slots-grid (frontLine, rearGuard, skill, info) + hand.
-// Si es el área local: hand clickeable. Si es el rival: hand face-down.
+// PlayerArea — fila horizontal de un jugador.
+// Layout: [Skill] [Unit 0] [Unit 1] [Unit 2] [Unit 3] [Unit 4]
+//
+// PlayerInfo fue movido al InfoSidebar (columna izquierda), por eso ya no
+// aparece aquí. Recibe handlers de click ya resueltos por el Board.
 // ============================================================================
 
-import Hand from '@components/Hand/Hand';
-import PlayerInfo from '@components/PlayerInfo/PlayerInfo';
+import DamageFloat from '@components/DamageFloat/DamageFloat';
 import Slot from '@components/Slot/Slot';
-import type { PlayerId, PlayerState, SlotIndicator } from '@shared/types';
+import { getEffectiveStats } from '@server/combat';
+import type { PlayerId, PlayerState, UnitSlotIndex } from '@shared/types';
+import { UNIT_SLOTS } from '@shared/types';
 import clsx from 'clsx';
 import styles from './PlayerArea.module.css';
 
@@ -16,22 +19,25 @@ interface PlayerAreaProps {
   player: PlayerState;
   isLocal: boolean;
   isActive: boolean;
-  turnNumber: number;
-  maxTurns: number;
-  /** Selección actual: instanceId seleccionado y por quién. */
-  localSelectedInstanceId: string | null;
-  opponentSelectedInstanceId: string | null;
-  /** Slots válidos para la carta seleccionada actualmente. */
-  validSlots: SlotIndicator[];
-  /** Si esta área debe mostrar el rival como activo (para halo de selección). */
-  showOpponentSelection: boolean;
-  /** Handler de click en una carta de la mano. */
-  onHandCardClick?: (instanceId: string) => void;
-  /** Handler de click en un slot. */
-  onSlotClick?: (slot: SlotIndicator) => void;
-  /** Orientación: 'top' (cabeza al norte) o 'bottom' (cabeza al sur).
-   *  Afecta el orden interno del grid (FL/Skill arriba en top, abajo en bottom). */
-  orientation: 'top' | 'bottom';
+  /** Slots de unidad válidos para placement (vacío si no aplica). */
+  validUnitPlacements: Set<UnitSlotIndex>;
+  /** ¿La skill slot es válida para placement? */
+  validSkillPlacement: boolean;
+  validSkillReplace: boolean;
+  /** Slots enemigos que están en reach de un atacante seleccionado. */
+  validAttackTargets: Set<UnitSlotIndex>;
+  /** Slot de unidad propio que está seleccionado como atacante. */
+  selectedAttackerSlot: UnitSlotIndex | null;
+  onUnitSlotClick?: (index: UnitSlotIndex) => void;
+  onSkillSlotClick?: () => void;
+  /** Hay un atacante seleccionado — dimear todo lo que no sea relevante. */
+  attackModeActive?: boolean;
+  /** Slots cuyas unidades ya atacaron este turno — visual agotado, no seleccionable. */
+  exhaustedSlots?: Set<UnitSlotIndex>;
+  /** Animaciones de daño pendientes por slot (key = slotIndex). */
+  slotAnims?: Partial<Record<UnitSlotIndex, { id: number; amount: number }>>;
+  /** Animación de daño a vida (excedente o ataque directo). */
+  lifeDamageAnim?: { id: number; amount: number } | null;
 }
 
 export default function PlayerArea({
@@ -39,76 +45,78 @@ export default function PlayerArea({
   player,
   isLocal,
   isActive,
-  turnNumber,
-  maxTurns,
-  localSelectedInstanceId,
-  opponentSelectedInstanceId,
-  validSlots,
-  showOpponentSelection,
-  onHandCardClick,
-  onSlotClick,
-  orientation,
+  validUnitPlacements,
+  validSkillPlacement,
+  validSkillReplace,
+  validAttackTargets,
+  selectedAttackerSlot,
+  onUnitSlotClick,
+  onSkillSlotClick,
+  attackModeActive,
+  exhaustedSlots,
+  slotAnims,
+  lifeDamageAnim,
 }: PlayerAreaProps) {
-  const isFrontHighlighted = validSlots.includes('frontLine');
-  const isRearHighlighted = validSlots.includes('rearGuard');
-  const isSkillHighlighted = validSlots.includes('skill') || validSlots.includes('skill_replace');
-
   const skillState = player.skill?.state;
-  // El rival no debe ver mi skill mientras esté hidden.
+  // El rival no ve mi skill mientras esté hidden.
   const hideSkillFromOpponent = !isLocal && skillState === 'hidden';
 
   return (
-    <section
-      className={clsx(
-        styles.area,
-        'fancy-border',
-        styles[`orient-${orientation}`],
-        isActive && styles.active,
-      )}
-    >
-      <div className={styles.slotsGrid}>
-        <Slot
-          slot="rearGuard"
-          card={player.rearGuard}
-          highlighted={isRearHighlighted}
-          onClick={isRearHighlighted ? () => onSlotClick?.('rearGuard') : undefined}
-        />
-        <PlayerInfo
-          playerId={playerId}
-          player={player}
-          isActive={isActive}
-          turnNumber={turnNumber}
-          maxTurns={maxTurns}
-        />
-        <Slot
-          slot="frontLine"
-          card={player.frontLine}
-          highlighted={isFrontHighlighted}
-          onClick={isFrontHighlighted ? () => onSlotClick?.('frontLine') : undefined}
-        />
-        <Slot
-          slot="skill"
-          card={player.skill?.card}
-          skillState={skillState}
-          hideSkillFromOpponent={hideSkillFromOpponent}
-          highlighted={isSkillHighlighted}
-          onClick={
-            isSkillHighlighted
-              ? () =>
-                  onSlotClick?.(validSlots.includes('skill_replace') ? 'skill_replace' : 'skill')
-              : undefined
-          }
-        />
-      </div>
+    <section className={clsx(styles.area, 'fancy-border', isActive && styles.active)}>
 
-      <Hand
-        cards={player.hand}
-        playerId={playerId}
-        isLocal={isLocal}
-        selectedInstanceId={isLocal ? localSelectedInstanceId : opponentSelectedInstanceId}
-        showOpponentSelection={showOpponentSelection}
-        onCardClick={onHandCardClick}
+      {/* Skill slot — fuera del campo de ataque, no atacable.
+          En modo ataque siempre se dimea (no es target ni atacante). */}
+      <Slot
+        card={player.skill?.card}
+        skillState={skillState}
+        hideSkillFromOpponent={hideSkillFromOpponent}
+        validPlacement={validSkillPlacement || validSkillReplace}
+        label="SKILL"
+        onClick={validSkillPlacement || validSkillReplace ? onSkillSlotClick : undefined}
+        dimmed={!!attackModeActive}
       />
+
+      {/* 5 unit slots en fila */}
+      <div className={styles.unitsRow}>
+        {Array.from({ length: UNIT_SLOTS }, (_, i) => {
+          const index = i as UnitSlotIndex;
+          const card = player.units[index];
+          const isValidPlacement = validUnitPlacements.has(index);
+          const isValidTarget = validAttackTargets.has(index);
+          const isSelectedAttacker = selectedAttackerSlot === index;
+          const isExhausted = !!exhaustedSlots?.has(index);
+          // Exhausted: no se puede seleccionar como atacante (excluir de interactive)
+          const interactive =
+            !isExhausted && (isValidPlacement || isValidTarget || (isLocal && card !== null));
+          // Dimear en modo ataque si no es ni el atacante ni un target válido
+          const isDimmed = !!attackModeActive && !isSelectedAttacker && !isValidTarget;
+          // Estadísticas efectivas con bonos de Support (HERMES +1 FP, ATHENA +2 AR)
+          const effStats = getEffectiveStats(player, index);
+          return (
+            <Slot
+              key={`u-${playerId}-${i}`}
+              card={card}
+              validPlacement={isValidPlacement}
+              validTarget={isValidTarget}
+              selectedAttacker={isSelectedAttacker}
+              label={`${i + 1}`}
+              onClick={interactive && onUnitSlotClick ? () => onUnitSlotClick(index) : undefined}
+              dimmed={isDimmed}
+              exhausted={isExhausted}
+              damageAnim={slotAnims?.[index] ?? null}
+              effectiveFp={effStats?.effectiveFp}
+              effectiveAr={effStats?.effectiveAr}
+            />
+          );
+        })}
+
+        {/* Float de daño a vida (excedente o ataque directo) */}
+        {lifeDamageAnim && (
+          <div className={styles.lifeDamageAnchor}>
+            <DamageFloat key={lifeDamageAnim.id} amount={lifeDamageAnim.amount} />
+          </div>
+        )}
+      </div>
     </section>
   );
 }

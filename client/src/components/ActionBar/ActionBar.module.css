@@ -18,6 +18,18 @@
   border-bottom: 1px solid var(--bg-deep);
 }
 
+.attacksLeft {
+  color: var(--text-light);
+  font-size: 14px;
+  text-align: center;
+  padding: 4px 0;
+}
+.attacksLeft strong {
+  color: var(--red);
+  font-size: 18px;
+  font-family: 'Cinzel', serif;
+}
+
 .waiting {
   color: var(--text-dim);
   font-size: 14px;

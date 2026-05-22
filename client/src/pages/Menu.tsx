@@ -70,6 +70,7 @@ export default function Menu() {
         vidaInicial: vida,
         maxTurnos: turnos,
         forceP1Start: false,
+        attacksPerTurn: 3,
       });
       setWaitingRoomId(roomId);
       setMode('waiting');

@@ -1,7 +1,6 @@
 // ============================================================================
 // ActionBar — botones contextuales según fase + estado del juego.
-// Toda la lógica de "¿qué puede hacer el local player ahora mismo?" vive acá.
-// Cada botón llama a una función de gameService (server-authoritative).
+// Mecánica nueva: muestra ataques restantes + End turn (sin needsRefill).
 // ============================================================================
 
 import { useSound } from '@hooks/useSound';
@@ -9,7 +8,6 @@ import { Game } from '@server/gameEngine';
 import * as gameService from '@services/gameService';
 import type { PlayerId, SerializedGameState } from '@shared/types';
 import { useUIStore } from '@store/uiStore';
-import clsx from 'clsx';
 import { useEffect } from 'react';
 import styles from './ActionBar.module.css';
 
@@ -23,12 +21,10 @@ const btnCls = 'fancy-button fancy-button-sm';
 
 export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) {
   const setErrorMessage = useUIStore((s) => s.setErrorMessage);
-  const isAnimating = useUIStore((s) => s.isAnimating);
-  const setIsAnimating = useUIStore((s) => s.setIsAnimating);
-  const setSelectedInstanceId = useUIStore((s) => s.setSelectedInstanceId);
+  const clearSelection = useUIStore((s) => s.clearSelection);
   const playSound = useSound();
 
-  // SFX al cambiar a phase=over (una sola vez por victoria/derrota).
+  // SFX al cambiar a phase=over (una sola vez).
   useEffect(() => {
     if (state.phase === 'over' && state.gameOver) {
       const winner = state.gameOver.winner;
@@ -48,14 +44,16 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
 
   const game = Game.fromSerialized(state);
 
-  // ─── Fase setup ──────────────────────────────────────────────────────
+  // ─── Fase setup ─────────────────────────────────────────────────────
   if (state.phase === 'setup') {
     if (!state.setupState) return null;
     const isMyTurn = state.setupState.currentPlayer === localSeat;
     if (!isMyTurn) {
       return (
         <div className={styles.bar}>
-          <div className={styles.waiting}>Waiting for Player {state.setupState.currentPlayer}…</div>
+          <div className={styles.waiting}>
+            Waiting for Player {state.setupState.currentPlayer}…
+          </div>
         </div>
       );
     }
@@ -92,7 +90,7 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
             <button
               className={btnCls}
               onClick={() => {
-                setSelectedInstanceId(null);
+                clearSelection();
                 run(() => gameService.finishSetup(roomId, localSeat));
               }}
             >
@@ -104,7 +102,7 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
     }
   }
 
-  // ─── Fase playing ────────────────────────────────────────────────────
+  // ─── Fase playing ──────────────────────────────────────────────────
   if (state.phase === 'playing') {
     const isMyTurn = state.activePlayer === localSeat;
     if (!isMyTurn) {
@@ -116,19 +114,19 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
     }
 
     const drawn = !!state.turnState?.drawnThisTurn;
-    const needsRefill = game.needsRefill(localSeat);
     const canEnd = game.canEndTurn(localSeat);
     const canReplace = game.canReplaceSkill(localSeat);
     const isReplacing = !!state.turnState?.isReplacingSkill;
-    // La mano máxima es 5. Si ya está llena, no mostramos Draw porque sería
-    // un no-op (drawTo cap at 5). React re-evalúa esto en cada render, así
-    // que se actualiza automáticamente al colocar/jugar una carta.
-    const handFull = state.players[localSeat].hand.length >= 5;
+    const attacksLeft = state.turnState?.attacksRemaining ?? 0;
+    const handFull = state.players[localSeat].hand.length >= 6;
 
     return (
       <div className={styles.bar}>
         <div className={styles.status}>
           Turn {state.turnNumber}/{state.config.maxTurnos} · Your turn
+        </div>
+        <div className={styles.attacksLeft}>
+          ⚔ Attacks remaining: <strong>{attacksLeft}</strong>
         </div>
 
         <div className={styles.buttons}>
@@ -144,7 +142,7 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
             <button
               className={btnCls}
               onClick={() => {
-                setSelectedInstanceId(null);
+                clearSelection();
                 run(() => gameService.exitReplaceSkillMode(roomId, localSeat));
               }}
             >
@@ -161,30 +159,24 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
           )}
         </div>
 
-        {needsRefill && (
-          <div className={styles.warn}>⚠ Fill empty slots with units from your hand.</div>
-        )}
-
         <div className={styles.buttons}>
           <button
-            className={clsx(btnCls)}
-            disabled={!canEnd || isAnimating}
+            className={btnCls}
+            disabled={!canEnd}
             onClick={async () => {
-              setIsAnimating(true);
-              setSelectedInstanceId(null);
+              clearSelection();
               playSound('turnEnd');
               await run(() => gameService.endTurn(roomId, localSeat));
-              setIsAnimating(false);
             }}
           >
-            {isAnimating ? 'Resolving…' : 'End turn'}
+            End turn
           </button>
         </div>
       </div>
     );
   }
 
-  // ─── Fase over ───────────────────────────────────────────────────────
+  // ─── Fase over ──────────────────────────────────────────────────────
   return (
     <div className={styles.bar}>
       <div className={styles.gameOver}>

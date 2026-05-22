@@ -11,6 +11,7 @@ import type { Card as CardType } from '@shared/types';
 import { asset } from '@utils/asset';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
+import { useUIStore } from '@store/uiStore';
 import { useRef, type MouseEvent } from 'react';
 import styles from './Card.module.css';
 
@@ -32,6 +33,14 @@ interface CardProps {
   enterDelay?: number;
   /** Style inline opcional (usado por Hand para posicionar via grid-column). */
   style?: React.CSSProperties;
+  /** Modo ataque activo y esta carta no es relevante — oscurece y desactiva. */
+  dimmed?: boolean;
+  /** Esta unidad ya atacó este turno — blanco y negro, sin hover-lift, sin click. */
+  exhausted?: boolean;
+  /** FP efectivo (con bonos de Support). Si difiere del base, se colorea en verde. */
+  effectiveFp?: number;
+  /** AR efectiva (con bonos de Support). Si difiere de la base, se colorea en verde. */
+  effectiveAr?: number;
 }
 
 export default function Card({
@@ -46,18 +55,34 @@ export default function Card({
   enterFromY = -16,
   enterDelay = 0,
   style,
+  dimmed,
+  exhausted,
+  effectiveFp,
+  effectiveAr,
 }: CardProps) {
   // Tracking del mouse para el efecto "spotlight" (luz orbital amarilla).
   // Actualizamos las CSS vars --mouse-x/--mouse-y directamente sobre el DOM
   // para evitar re-renders de React en cada movimiento del mouse.
   // Aplica a TODAS las cartas (hand, slots, rival) — no solo clickeables.
   const cardRef = useRef<HTMLButtonElement>(null);
+  const setHoveredCard = useUIStore((s) => s.setHoveredCard);
 
   const handleMouseMove = (e: MouseEvent<HTMLButtonElement>): void => {
     if (!cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     cardRef.current.style.setProperty('--mouse-x', `${e.clientX - rect.left}px`);
     cardRef.current.style.setProperty('--mouse-y', `${e.clientY - rect.top}px`);
+  };
+
+  // Actualiza el preview del sidebar izquierdo cuando el jugador pasa el cursor.
+  // Solo cartas con datos visibles (no backs): el oponente no puede hacer hover
+  // desde este browser, así que todos los eventos son del jugador local.
+  const handleMouseEnter = (): void => {
+    if (card && !faceDown) setHoveredCard(card);
+  };
+
+  const handleMouseLeave = (): void => {
+    if (card && !faceDown) setHoveredCard(null);
   };
 
   // Spring-based entrance. La Y inicial es parametrizable para que el robo
@@ -92,6 +117,8 @@ export default function Card({
     skillState === 'active' && styles.skillActive,
     skillState === 'consumed' && styles.skillConsumed,
     !onClick && styles.notClickable,
+    dimmed && styles.dimmed,
+    exhausted && styles.exhausted,
   );
 
   if (faceDown || !card) {
@@ -127,6 +154,8 @@ export default function Card({
       type="button"
       onClick={onClick}
       onMouseMove={handleMouseMove}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       aria-disabled={!onClick}
       tabIndex={onClick ? 0 : -1}
       className={clsx(className, isUnit ? styles.unit : styles.skill)}
@@ -135,8 +164,8 @@ export default function Card({
       initial={cardMotion.initial}
       animate={cardMotion.animate}
       exit={cardMotion.exit}
-      whileHover={onClick ? { y: -6 } : undefined}
-      whileTap={onClick ? { scale: 0.96 } : undefined}
+      whileHover={onClick && !exhausted ? { y: -6 } : undefined}
+      whileTap={onClick && !exhausted ? { scale: 0.96 } : undefined}
     >
       {/* Capa 1: imagen de la unidad/skill */}
       {card.image && (
@@ -148,8 +177,29 @@ export default function Card({
       <div className={styles.frameName}>{card.name}</div>
       {isUnit ? (
         <>
-          <div className={styles.frameFp}>{card.firepower}</div>
-          <div className={styles.frameAr}>{card.armor}</div>
+          {/* Las cartas Support no tienen ataque — nunca se muestra FP */}
+          {card.subtype !== 'Support' && (
+            <div
+              className={styles.frameFp}
+              style={
+                effectiveFp !== undefined && effectiveFp !== card.firepower
+                  ? { color: effectiveFp > card.firepower ? '#4ade80' : '#f87171' }
+                  : undefined
+              }
+            >
+              {effectiveFp !== undefined ? effectiveFp : card.firepower}
+            </div>
+          )}
+          <div
+            className={styles.frameAr}
+            style={
+              effectiveAr !== undefined && effectiveAr !== card.armor
+                ? { color: effectiveAr > card.armor ? '#4ade80' : '#f87171' }
+                : undefined
+            }
+          >
+            {effectiveAr !== undefined ? effectiveAr : card.armor}
+          </div>
           {card.lore && <div className={styles.frameDesc}>{card.lore}</div>}
         </>
       ) : (

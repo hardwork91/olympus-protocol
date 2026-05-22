@@ -1,11 +1,36 @@
 // ============================================================================
-// Tipos compartidos cliente ↔ server-logic (futuro backend).
-// Esta es la "fuente de verdad" del modelo de datos del juego.
+// Tipos compartidos cliente ↔ server-logic.
+// MECÁNICA NUEVA (rama new-combat-mechanic):
+//   - 5 unit slots en fila + 1 skill slot por jugador.
+//   - Slots alineados verticalmente: tu slot N ↔ slot N del rival.
+//   - 3 ataques por turno. Cada ataque: 1 atacante → 1 víctima.
+//   - Subtipo determina el reach del ataque:
+//       Assault    → Melee       (frente + 2 diagonales)
+//       Tank       → Demolition  (solo frente directo)
+//       Artillery  → Ranged      (cualquier slot enemigo)
+//       Support    → no ataca; ability única por carta (buff/taunt/debuff)
 // ============================================================================
 
 // ─── Subtipos de carta ─────────────────────────────────────────────────────
 export type UnitSubtype = 'Assault' | 'Tank' | 'Artillery' | 'Support';
 export type SkillSubtype = 'Offensive' | 'Defensive' | 'Trap';
+
+/** Tipo de ataque derivado del subtipo. Support no ataca → null. */
+export type AttackType = 'melee' | 'demolition' | 'ranged';
+
+/** Helper: ¿cuál es el reach de este subtipo? null si no ataca (Support). */
+export function getAttackType(subtype: UnitSubtype): AttackType | null {
+  switch (subtype) {
+    case 'Assault':
+      return 'melee';
+    case 'Tank':
+      return 'demolition';
+    case 'Artillery':
+      return 'ranged';
+    case 'Support':
+      return null;
+  }
+}
 
 // ─── Cartas ────────────────────────────────────────────────────────────────
 export type CardType = 'unit' | 'skill';
@@ -18,6 +43,8 @@ export interface UnitCard {
   readonly subtype: UnitSubtype;
   readonly firepower: number;
   readonly armor: number;
+  /** Descripción de la ability (solo Support cards). Implementación en Fase D. */
+  readonly ability?: string;
   readonly image?: string;
   readonly lore?: string;
 }
@@ -35,11 +62,21 @@ export interface SkillCard {
 export type Card = UnitCard | SkillCard;
 
 // ─── Slots ─────────────────────────────────────────────────────────────────
-export type SlotName = 'frontLine' | 'rearGuard' | 'skill';
 
-/** Slot indicator usado en validSlotsFor() / placeCard().
- *  `'skill_replace'` no es un slot físico, indica reemplazo de la skill ya colocada. */
-export type SlotIndicator = SlotName | 'skill_replace';
+/** Número de slots de unidad por jugador. */
+export const UNIT_SLOTS = 5;
+
+/** Índice válido de slot de unidad (0..4). */
+export type UnitSlotIndex = 0 | 1 | 2 | 3 | 4;
+
+/** Referencia a un slot del tablero, para placeCard y validación. */
+export type SlotRef =
+  | { kind: 'unit'; index: UnitSlotIndex }
+  | { kind: 'skill' }
+  | { kind: 'skill_replace' };
+
+/** Target de un ataque: un slot enemigo o la vida del rival. */
+export type AttackTarget = { kind: 'unit'; index: UnitSlotIndex } | { kind: 'life' };
 
 // ─── Jugador ───────────────────────────────────────────────────────────────
 export type PlayerId = 1 | 2;
@@ -51,9 +88,8 @@ export interface PlayerSkill {
   state: SkillState;
 }
 
-/** Efecto diferido en el jugador (ej. Trap Charge → +5 Firepower próximo ataque). */
 export interface PendingEffect {
-  type: 'trap_charge';
+  type: string;
   value?: number;
 }
 
@@ -61,8 +97,8 @@ export interface PlayerState {
   life: number;
   deck: Card[];
   hand: Card[];
-  frontLine: UnitCard | null;
-  rearGuard: UnitCard | null;
+  /** 5 slots de unidad. null = vacío. */
+  units: (UnitCard | null)[];
   skill: PlayerSkill | null;
   pendingEffects: PendingEffect[];
 }
@@ -82,12 +118,18 @@ export interface TurnState {
   skillReplacedThisTurn: boolean;
   drawnThisTurn: boolean;
   skillPlacedThisTurn: boolean;
+  /** Ataques restantes este turno (inicia en 3). */
+  attacksRemaining: number;
+  /** instanceIds de unidades que ya atacaron este turno (cada unidad ataca máx 1 vez). */
+  cardsAttackedThisTurn: string[];
 }
 
 export interface GameConfig {
   vidaInicial: number;
   maxTurnos: number;
   forceP1Start: boolean;
+  /** Ataques por turno (default 3). */
+  attacksPerTurn: number;
 }
 
 export interface Selection {
@@ -95,7 +137,6 @@ export interface Selection {
   2: string | null;
 }
 
-/** Entrada del log de combate. Se persiste con esta forma en Firebase. */
 export interface LogEntry {
   turn: number;
   player: PlayerId | null;
@@ -115,7 +156,6 @@ export interface GameOverData {
   stats: GameOverStats;
 }
 
-/** Estado JSON-safe que se persiste en Firebase y se reconstruye en el cliente. */
 export interface SerializedGameState {
   config: GameConfig;
   phase: GamePhase;
@@ -130,12 +170,11 @@ export interface SerializedGameState {
   selection: Selection;
 }
 
-// ─── Resultado del combate ─────────────────────────────────────────────────
-export interface DestroyedSlots {
-  attackerFront: boolean;
-  attackerRear: boolean;
-  defenderFront: boolean;
-  defenderRear: boolean;
+// ─── Resultado de un ataque individual ─────────────────────────────────────
+
+export interface DestroyedRef {
+  playerId: PlayerId;
+  slotIndex: UnitSlotIndex;
 }
 
 export interface ConsumedSkillRef {
@@ -145,24 +184,75 @@ export interface ConsumedSkillRef {
 
 export interface NewPendingEffectRef {
   playerId: PlayerId;
-  type: PendingEffect['type'];
+  type: string;
   value: number;
 }
 
 export interface ConsumedPendingEffectRef {
   playerId: PlayerId;
-  type: PendingEffect['type'];
+  type: string;
 }
 
+/** Daño a armor que NO destruye la unidad — la armor persiste al siguiente turno. */
+export interface ArmorDamageRef {
+  playerId: PlayerId;
+  slotIndex: UnitSlotIndex;
+  /** Nueva armor tras el ataque (> 0, la unidad sobrevive). */
+  newArmor: number;
+}
+
+/** Resultado de un solo ataque (1 atacante → 1 target). */
 export interface AttackResult {
   log: string[];
-  destroyed: DestroyedSlots;
+  /** Slots destruidos por este ataque. */
+  destroyed: DestroyedRef[];
+  /** Daño a vida del defensor (no muta state, lo aplica el motor). */
   lifeDamage: number;
+  /** Skills consumidas durante este ataque. */
   consumedSkills: ConsumedSkillRef[];
+  /** Pending effects nuevos creados. */
   newPendingEffects: NewPendingEffectRef[];
+  /** Pending effects que se consumieron al aplicarse. */
   consumedPendingEffects: ConsumedPendingEffectRef[];
+  /** Unidades que sobrevivieron con armor reducida (persiste al próximo turno). */
+  armorDamage: ArmorDamageRef[];
 }
 
-// ─── Helpers de tipos ──────────────────────────────────────────────────────
-/** Devuelve el seat opuesto. Útil en muchísimas reglas. */
+// ─── Helpers ───────────────────────────────────────────────────────────────
+/** Devuelve el seat opuesto. */
 export const otherPlayer = (id: PlayerId): PlayerId => (id === 1 ? 2 : 1);
+
+/** Valida que un índice esté en rango 0..UNIT_SLOTS-1. */
+export function isValidSlotIndex(n: number): n is UnitSlotIndex {
+  return Number.isInteger(n) && n >= 0 && n < UNIT_SLOTS;
+}
+
+/**
+ * Calcula los slots ENEMIGOS que un atacante puede alcanzar según su attackType.
+ * - melee: frente directo + 2 diagonales
+ * - demolition: solo frente directo
+ * - ranged: todos los slots
+ * Devuelve los índices de slot enemigo dentro de [0..UNIT_SLOTS-1].
+ */
+export function getReachableSlots(
+  attackType: AttackType,
+  attackerSlot: UnitSlotIndex,
+): UnitSlotIndex[] {
+  const result: UnitSlotIndex[] = [];
+  if (attackType === 'ranged') {
+    for (let i = 0; i < UNIT_SLOTS; i++) {
+      if (isValidSlotIndex(i)) result.push(i);
+    }
+    return result;
+  }
+  // Frente directo (siempre alcanzable por melee y demolition)
+  result.push(attackerSlot);
+  if (attackType === 'melee') {
+    // Diagonales: slot-1 y slot+1
+    const left = attackerSlot - 1;
+    const right = attackerSlot + 1;
+    if (isValidSlotIndex(left)) result.push(left);
+    if (isValidSlotIndex(right)) result.push(right);
+  }
+  return result;
+}

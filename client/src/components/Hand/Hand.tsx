@@ -28,6 +28,8 @@ interface HandProps {
   showOpponentSelection?: boolean;
   onCardClick?: (instanceId: string) => void;
   maxSlots?: number;
+  /** Hay un atacante seleccionado en el campo — dimear todas las cartas de mano. */
+  attackModeActive?: boolean;
 }
 
 export default function Hand({
@@ -37,7 +39,8 @@ export default function Hand({
   selectedInstanceId,
   showOpponentSelection,
   onCardClick,
-  maxSlots = 5,
+  maxSlots = 6,
+  attackModeActive,
 }: HandProps) {
   const enterFromY = isLocal ? '100vh' : '-100vh';
 
@@ -112,6 +115,7 @@ export default function Hand({
                   enterFromY={enterFromY}
                   enterDelay={slotIndex * 0.08}
                   style={{ position: 'absolute', inset: 0 }}
+                  dimmed={isLocal && !!attackModeActive}
                 />
               )}
             </AnimatePresence>

@@ -1,21 +1,27 @@
 // ============================================================================
-// Motor del juego (Game). Implementa la máquina de estados (6.1) y el bucle
-// de turno (6.2) del design doc de Olympus Protocol.
+// Motor del juego (Game) — MECÁNICA NUEVA.
 //
-// **CONTRATO**: este archivo NO importa nada de UI, React, Firebase, ni nada
-// del cliente. Solo depende de @shared. Cuando aparezca el backend real,
-// esta carpeta entera se copia/mueve sin cambios.
+// Diferencias clave vs versión anterior:
+//   - PlayerState.units es un array de 5 slots (en lugar de frontLine/rearGuard).
+//   - Combate es target-selection: cada turno tiene N ataques (default 3),
+//     cada ataque se declara individualmente y se resuelve enseguida.
+//   - endTurn ya NO resuelve combate automáticamente — solo cierra el turno.
+//   - Setup coloca hasta 5 unidades + 1 skill al inicio.
+//
+// **Contrato**: este archivo NO importa nada de UI, React, Firebase, ni nada
+// del cliente. Solo depende de @shared.
 // ============================================================================
 
-import { buildDeck, countUnits, shuffle } from '../shared/cards';
+import { buildDeck, countUnits, shuffle, SKILL_ID } from '../shared/cards';
 import type {
+  AttackResult,
+  AttackTarget,
   Card,
   GameConfig,
   GameOverData,
   GameOverReason,
   GamePhase,
   LogEntry,
-  PendingEffect,
   PlayerId,
   PlayerSkill,
   PlayerState,
@@ -23,12 +29,20 @@ import type {
   SerializedGameState,
   SetupState,
   SkillCard,
-  SlotIndicator,
+  SlotRef,
   TurnState,
   UnitCard,
+  UnitSlotIndex,
 } from '../shared/types';
-import { otherPlayer } from '../shared/types';
+import { UNIT_SLOTS, getAttackType, isValidSlotIndex, otherPlayer } from '../shared/types';
 import { resolveAttack } from './combat';
+
+/** Cantidad inicial de cartas en mano para llenar el setup (5 units + 1 skill). */
+const INITIAL_HAND_SIZE = 6;
+/** Cantidad máxima de cartas en mano durante el juego (a la que se rellena por draw). */
+const PLAY_HAND_SIZE = 5;
+/** Default de ataques por turno. */
+const DEFAULT_ATTACKS_PER_TURN = 3;
 
 export class Game {
   config: GameConfig;
@@ -48,9 +62,9 @@ export class Game {
       vidaInicial: config.vidaInicial ?? 20,
       maxTurnos: config.maxTurnos ?? 20,
       forceP1Start: config.forceP1Start ?? false,
+      attacksPerTurn: config.attacksPerTurn ?? DEFAULT_ATTACKS_PER_TURN,
     };
 
-    // ─── Mazo común y reparto ───
     const fullDeck = shuffle(buildDeck()); // 40 cartas
     const p1Deck = fullDeck.slice(0, 20);
     const p2Deck = fullDeck.slice(20, 40);
@@ -60,34 +74,26 @@ export class Game {
       2: createPlayer(p2Deck, this.config.vidaInicial),
     };
 
-    // Robar 5 iniciales
-    this.drawTo(1, 5);
-    this.drawTo(2, 5);
+    // Robo inicial = 6 cartas (alcanza para 5 units + 1 skill en setup)
+    this.drawTo(1, INITIAL_HAND_SIZE);
+    this.drawTo(2, INITIAL_HAND_SIZE);
 
-    // Estado general
     this.phase = 'setup';
     this.activePlayer = null;
     this.turnNumber = 1;
     this.turnsInFullTurn = 0;
     this.combatLog = [];
 
-    // Fase de setup
     this.setupState = {
       currentPlayer: 1,
       step: 'mulligan_or_confirm',
     };
 
-    // Estado de turno (sólo válido en phase=playing)
     this.turnState = null;
-
-    // Resultado final
     this.gameOver = null;
-
-    // Selección de carta por jugador (visible al rival): instanceId | null por seat.
     this.selection = { 1: null, 2: null };
   }
 
-  // Actualiza la carta seleccionada por un jugador (null para limpiar).
   setSelection(playerId: PlayerId, instanceId: string | null): void {
     this.selection[playerId] = instanceId ?? null;
   }
@@ -115,6 +121,11 @@ export class Game {
     return p.hand.splice(idx, 1)[0] ?? null;
   }
 
+  /** Devuelve true si TODOS los slots de unidad están vacíos. */
+  hasNoUnits(playerId: PlayerId): boolean {
+    return this.players[playerId].units.every((u) => u === null);
+  }
+
   // ────────────────────────────────────────────────────────────────────
   // Fase de SETUP
   // ────────────────────────────────────────────────────────────────────
@@ -124,19 +135,17 @@ export class Game {
     if (!this.setupState) return false;
     if (this.setupState.currentPlayer !== playerId) return false;
     if (this.setupState.step !== 'mulligan_or_confirm') return false;
-    return countUnits(this.players[playerId].hand) < 2;
+    // Mulligan si hay menos de 3 units en mano (no alcanza para fill aceptable).
+    return countUnits(this.players[playerId].hand) < 3;
   }
 
   declareMulligan(playerId: PlayerId): boolean {
     if (!this.canDeclareMulligan(playerId)) return false;
     const p = this.players[playerId];
-    // Devolver mano al mazo
     p.deck.push(...p.hand);
     p.hand = [];
-    // Barajar mazo personal
     p.deck = shuffle(p.deck);
-    // Robar 5 nuevas
-    this.drawTo(playerId, 5);
+    this.drawTo(playerId, INITIAL_HAND_SIZE);
     this.log(`Player ${playerId} declares mulligan. New hand: ${p.hand.length} cards.`);
     return true;
   }
@@ -151,65 +160,60 @@ export class Game {
     return true;
   }
 
-  /** Slots válidos para colocar la carta seleccionada. */
-  validSlotsFor(playerId: PlayerId, instanceId: string): SlotIndicator[] {
+  /** Slots válidos donde puede colocarse la carta seleccionada. */
+  validSlotsFor(playerId: PlayerId, instanceId: string): SlotRef[] {
     const card = this.players[playerId].hand.find((c) => c.instanceId === instanceId);
     if (!card) return [];
-    const slots: SlotIndicator[] = [];
+    const player = this.players[playerId];
+    const slots: SlotRef[] = [];
 
-    if (this.phase === 'setup') {
-      if (!this.setupState || this.setupState.currentPlayer !== playerId) return [];
-      if (this.setupState.step === 'placing') {
-        if (card.type === 'unit') {
-          if (!this.players[playerId].frontLine) slots.push('frontLine');
-          if (!this.players[playerId].rearGuard) slots.push('rearGuard');
+    const isSetupPlacing =
+      this.phase === 'setup' &&
+      this.setupState?.currentPlayer === playerId &&
+      this.setupState.step === 'placing';
+    const isPlayingActive = this.phase === 'playing' && this.activePlayer === playerId;
+
+    if (!isSetupPlacing && !isPlayingActive) return [];
+
+    if (card.type === 'unit') {
+      for (let i = 0; i < UNIT_SLOTS; i++) {
+        if (player.units[i] === null && isValidSlotIndex(i)) {
+          slots.push({ kind: 'unit', index: i });
         }
-        if (card.type === 'skill') {
-          if (!this.players[playerId].skill) slots.push('skill');
-        }
       }
-      return slots;
+    } else if (card.type === 'skill') {
+      const skillPlacedThisTurn = isPlayingActive && this.turnState?.skillPlacedThisTurn;
+      if (!player.skill && !skillPlacedThisTurn) {
+        slots.push({ kind: 'skill' });
+      }
+      if (isPlayingActive && this.turnState?.isReplacingSkill && player.skill) {
+        slots.push({ kind: 'skill_replace' });
+      }
     }
-
-    if (this.phase === 'playing') {
-      if (this.activePlayer !== playerId || !this.turnState) return [];
-      const ts = this.turnState;
-      if (card.type === 'unit') {
-        if (!this.players[playerId].frontLine) slots.push('frontLine');
-        if (!this.players[playerId].rearGuard) slots.push('rearGuard');
-      }
-      if (card.type === 'skill') {
-        if (!this.players[playerId].skill && !ts.skillPlacedThisTurn) slots.push('skill');
-      }
-      if (ts.isReplacingSkill && card.type === 'skill' && this.players[playerId].skill) {
-        slots.push('skill_replace');
-      }
-      return slots;
-    }
-
-    return [];
+    return slots;
   }
 
-  placeCard(playerId: PlayerId, instanceId: string, slot: SlotIndicator): boolean {
+  placeCard(playerId: PlayerId, instanceId: string, slot: SlotRef): boolean {
     const valid = this.validSlotsFor(playerId, instanceId);
-    if (!valid.includes(slot)) return false;
+    if (!valid.some((s) => slotRefEquals(s, slot))) return false;
     const card = this.removeFromHand(playerId, instanceId);
     if (!card) return false;
     const p = this.players[playerId];
 
-    if (slot === 'frontLine') {
+    if (slot.kind === 'unit') {
       if (card.type !== 'unit') return false;
-      p.frontLine = card;
-    } else if (slot === 'rearGuard') {
-      if (card.type !== 'unit') return false;
-      p.rearGuard = card;
-    } else if (slot === 'skill') {
+      p.units[slot.index] = card;
+      this.log(
+        `Player ${playerId} places #${card.id} ${card.name} in unit slot ${slot.index}.`,
+      );
+    } else if (slot.kind === 'skill') {
       if (card.type !== 'skill') return false;
       p.skill = { card, state: 'hidden' };
       if (this.phase === 'playing' && this.turnState) {
         this.turnState.skillPlacedThisTurn = true;
       }
-    } else if (slot === 'skill_replace') {
+      this.log(`Player ${playerId} places #${card.id} ${card.name} in skill.`);
+    } else if (slot.kind === 'skill_replace') {
       if (card.type !== 'skill') return false;
       const oldSkill = p.skill;
       if (!oldSkill) return false;
@@ -224,13 +228,9 @@ export class Game {
       }
     }
 
-    if (slot !== 'skill_replace') {
-      this.log(`Player ${playerId} places #${card.id} ${card.name} in ${slot}.`);
-    }
     return true;
   }
 
-  /** El jugador finaliza su setup; pasa al siguiente o al coin flip. */
   finishSetup(playerId: PlayerId): boolean {
     if (this.phase !== 'setup') return false;
     if (!this.setupState) return false;
@@ -242,7 +242,6 @@ export class Game {
       this.setupState.currentPlayer = 2;
       this.setupState.step = 'mulligan_or_confirm';
     } else {
-      // Ambos jugadores listos → coin flip + reveal
       this.coinFlip();
     }
     return true;
@@ -250,14 +249,13 @@ export class Game {
 
   coinFlip(): void {
     this.activePlayer = this.config.forceP1Start ? 1 : Math.random() < 0.5 ? 1 : 2;
-    this.log(`🪙 Coin flip: Player ${this.activePlayer} attacks first.`);
-    this.log(`🎴 Setup combat cards revealed.`);
+    this.log(`🪙 Coin flip: Player ${this.activePlayer} acts first.`);
     this.phase = 'playing';
     this.startTurn(this.activePlayer);
   }
 
   // ────────────────────────────────────────────────────────────────────
-  // Fase de PLAYING — bucle de turno (sección 6.2)
+  // Fase de PLAYING
   // ────────────────────────────────────────────────────────────────────
 
   startTurn(playerId: PlayerId): void {
@@ -266,15 +264,14 @@ export class Game {
       skillReplacedThisTurn: false,
       drawnThisTurn: false,
       skillPlacedThisTurn: false,
+      attacksRemaining: this.config.attacksPerTurn,
+      cardsAttackedThisTurn: [],
     };
 
-    // Voltear skills:
-    //  - Offensive del jugador activo (si tiene una hidden)
-    //  - Defensive del rival (si tiene una hidden)
-    //  - NO voltear trampas (esperan condición)
     const active = this.players[playerId];
     const rival = this.players[otherPlayer(playerId)];
 
+    // Voltear Offensive del activo
     if (
       active.skill &&
       active.skill.state === 'hidden' &&
@@ -284,13 +281,28 @@ export class Game {
       this.log(
         `⚡ Player ${playerId} flips Offensive: #${active.skill.card.id} ${active.skill.card.name}`,
       );
-    }
-    if (rival.skill && rival.skill.state === 'hidden' && rival.skill.card.subtype === 'Defensive') {
-      rival.skill.state = 'active';
-      this.log(`🛡 Rival player flips Defensive: #${rival.skill.card.id} ${rival.skill.card.name}`);
+      // DOUBLE-SHOT da un ataque extra este turno.
+      if (active.skill.card.id === SKILL_ID.DOUBLE_SHOT) {
+        this.turnState.attacksRemaining += 1;
+        this.log(`⚡ DOUBLE-SHOT grants +1 attack this turn.`);
+      }
     }
 
-    this.log(`▶ Turn ${this.turnNumber}, active player: ${playerId}`);
+    // Voltear Defensive del rival
+    if (
+      rival.skill &&
+      rival.skill.state === 'hidden' &&
+      rival.skill.card.subtype === 'Defensive'
+    ) {
+      rival.skill.state = 'active';
+      this.log(
+        `🛡 Rival flips Defensive: #${rival.skill.card.id} ${rival.skill.card.name}`,
+      );
+    }
+
+    this.log(
+      `▶ Turn ${this.turnNumber}, active player: ${playerId} (${this.turnState.attacksRemaining} attacks available)`,
+    );
   }
 
   canReplaceSkill(playerId: PlayerId): boolean {
@@ -314,107 +326,141 @@ export class Game {
     return true;
   }
 
-  /** Paso 2: robar (automático, se llama tras posible reemplazo). */
   drawPhase(playerId: PlayerId): void {
     if (this.phase !== 'playing') return;
     if (this.activePlayer !== playerId || !this.turnState) return;
     if (this.turnState.drawnThisTurn) return;
-    this.drawTo(playerId, 5);
+    this.drawTo(playerId, PLAY_HAND_SIZE);
     this.turnState.drawnThisTurn = true;
     this.log(
-      `Player ${playerId} draws up to 5 cards (hand: ${this.players[playerId].hand.length}).`,
+      `Player ${playerId} draws up to ${PLAY_HAND_SIZE} cards (hand: ${this.players[playerId].hand.length}).`,
     );
   }
 
-  /** Paso 3: reponer slots vacíos es obligatorio si hay unidades en mano. */
-  needsRefill(playerId: PlayerId): boolean {
-    if (this.phase !== 'playing') return false;
-    if (this.activePlayer !== playerId) return false;
-    const p = this.players[playerId];
-    if (p.frontLine && p.rearGuard) return false;
-    return p.hand.some((c) => c.type === 'unit');
-  }
+  // ────────────────────────────────────────────────────────────────────
+  // Ataques (target-selection)
+  // ────────────────────────────────────────────────────────────────────
 
-  canEndTurn(playerId: PlayerId): boolean {
+  /** ¿Puede el jugador atacar con la unidad en slot `attackerSlot`? */
+  canAttackWith(playerId: PlayerId, attackerSlot: UnitSlotIndex): boolean {
     if (this.phase !== 'playing') return false;
-    if (this.activePlayer !== playerId) return false;
-    if (this.needsRefill(playerId)) return false;
+    if (this.activePlayer !== playerId || !this.turnState) return false;
+    if (this.turnState.attacksRemaining <= 0) return false;
+
+    const card = this.players[playerId].units[attackerSlot];
+    if (!card) return false;
+    if (getAttackType(card.subtype) === null) return false; // Support no ataca
+    if (this.turnState.cardsAttackedThisTurn.includes(card.instanceId)) return false;
     return true;
   }
 
-  /** "Fin de turno": resolveAttack + consumeUsedSkills + checkVictory + switch active. */
-  endTurn(): ReturnType<typeof resolveAttack> | null {
-    if (this.activePlayer === null) return null;
-    if (!this.canEndTurn(this.activePlayer)) return null;
-    const attackerId = this.activePlayer;
-    const defenderId = otherPlayer(attackerId);
+  /**
+   * Declara y resuelve un ataque del atacante en `attackerSlot` contra `target`.
+   * Aplica destrucción, daño a vida, y verifica victoria.
+   * @returns AttackResult o null si la acción es inválida.
+   */
+  declareAttack(
+    playerId: PlayerId,
+    attackerSlot: UnitSlotIndex,
+    target: AttackTarget,
+  ): AttackResult | null {
+    if (!this.canAttackWith(playerId, attackerSlot) || !this.turnState) return null;
+    const attackerCard = this.players[playerId].units[attackerSlot];
+    if (!attackerCard) return null;
 
-    // Asegurar robo automático antes (edge case por flujo manual)
-    if (this.turnState && !this.turnState.drawnThisTurn) {
-      this.drawPhase(attackerId);
+    const result = resolveAttack(this, playerId, attackerSlot, target);
+
+    // Si el log devuelve solo una entrada de "⚠ Invalid" significa que la
+    // validación interna rechazó el ataque. No consumimos un ataque.
+    const isInvalid =
+      result.destroyed.length === 0 &&
+      result.lifeDamage === 0 &&
+      result.log.length > 0 &&
+      result.log[0]!.startsWith('⚠');
+    if (isInvalid) {
+      for (const entry of result.log) this.log(entry);
+      return null;
     }
 
-    const attackResult = resolveAttack(this, attackerId, defenderId);
-    for (const entry of attackResult.log) this.log(entry);
+    // Consumir el ataque (esta carta atacó este turno).
+    this.turnState.attacksRemaining -= 1;
+    this.turnState.cardsAttackedThisTurn.push(attackerCard.instanceId);
 
-    // Aplicar destrucciones (al fondo del mazo del propietario)
-    if (attackResult.destroyed.attackerFront && this.players[attackerId].frontLine) {
-      this.sendToBottom(attackerId, this.players[attackerId].frontLine);
-      this.players[attackerId].frontLine = null;
-    }
-    if (attackResult.destroyed.attackerRear && this.players[attackerId].rearGuard) {
-      this.sendToBottom(attackerId, this.players[attackerId].rearGuard);
-      this.players[attackerId].rearGuard = null;
-    }
-    if (attackResult.destroyed.defenderFront && this.players[defenderId].frontLine) {
-      this.sendToBottom(defenderId, this.players[defenderId].frontLine);
-      this.players[defenderId].frontLine = null;
-    }
-    if (attackResult.destroyed.defenderRear && this.players[defenderId].rearGuard) {
-      this.sendToBottom(defenderId, this.players[defenderId].rearGuard);
-      this.players[defenderId].rearGuard = null;
-    }
+    // Aplicar resultado al state.
+    for (const entry of result.log) this.log(entry);
 
-    // Aplicar daño a vida
-    this.players[defenderId].life -= attackResult.lifeDamage;
-    if (this.players[defenderId].life < 0) this.players[defenderId].life = 0;
-
-    // Consumir skills usadas (al fondo del mazo)
-    for (const { playerId, skillId } of attackResult.consumedSkills) {
-      const p = this.players[playerId];
-      if (p.skill && p.skill.card.id === skillId) {
-        this.sendToBottom(playerId, p.skill.card);
-        p.skill = null;
+    for (const d of result.destroyed) {
+      const card = this.players[d.playerId].units[d.slotIndex];
+      if (card) {
+        this.sendToBottom(d.playerId, card);
+        this.players[d.playerId].units[d.slotIndex] = null;
       }
     }
 
-    // Consumir pendingEffects que se aplicaron
-    for (const { playerId, type } of attackResult.consumedPendingEffects) {
-      const arr = this.players[playerId].pendingEffects;
+    const defenderId = otherPlayer(playerId);
+    if (result.lifeDamage > 0) {
+      this.players[defenderId].life -= result.lifeDamage;
+      if (this.players[defenderId].life < 0) this.players[defenderId].life = 0;
+    }
+
+    // Consumir skills + pendingEffects (lógica vieja, mantenida para
+    // compatibilidad estructural; efectos reales vienen en Fase D).
+    for (const { playerId: pid, skillId } of result.consumedSkills) {
+      const p = this.players[pid];
+      if (p.skill && p.skill.card.id === skillId) {
+        this.sendToBottom(pid, p.skill.card);
+        p.skill = null;
+      }
+    }
+    for (const { playerId: pid, type } of result.consumedPendingEffects) {
+      const arr = this.players[pid].pendingEffects;
       const idx = arr.findIndex((e) => e.type === type);
       if (idx >= 0) arr.splice(idx, 1);
     }
-
-    // Añadir nuevos pendingEffects
-    for (const { playerId, type, value } of attackResult.newPendingEffects) {
-      this.players[playerId].pendingEffects.push({ type, value });
+    for (const { playerId: pid, type, value } of result.newPendingEffects) {
+      this.players[pid].pendingEffects.push({ type, value });
     }
 
     // Verificar victoria por vida 0
     if (this.players[defenderId].life <= 0) {
-      this.endGame({ winner: attackerId, reason: 'life' });
-      return attackResult;
+      this.endGame({ winner: playerId, reason: 'life' });
     }
 
-    // Cambiar jugador activo. Si se cierra el turno completo, incrementar turnNumber.
-    this.activePlayer = defenderId;
+    return result;
+  }
+
+  // ────────────────────────────────────────────────────────────────────
+  // End turn (ya no resuelve combate)
+  // ────────────────────────────────────────────────────────────────────
+
+  canEndTurn(playerId: PlayerId): boolean {
+    if (this.phase !== 'playing') return false;
+    if (this.activePlayer !== playerId) return false;
+    // El usuario puede terminar el turno cuando quiera (no obligamos a usar
+    // todos los ataques).
+    return true;
+  }
+
+  endTurn(): void {
+    if (this.activePlayer === null) return;
+    if (!this.canEndTurn(this.activePlayer)) return;
+    const endingPlayer = this.activePlayer;
+    const nextPlayer = otherPlayer(endingPlayer);
+
+    this.log(`▶ Player ${endingPlayer} ends turn.`);
+
+    // Consumir skills 'active' al cierre del turno (se desgastan).
+    // Las traps en 'hidden' permanecen hasta dispararse.
+    this.consumeActiveSkill(endingPlayer);
+    this.consumeActiveSkill(nextPlayer);
+
+    this.activePlayer = nextPlayer;
     this.turnsInFullTurn += 1;
     if (this.turnsInFullTurn >= 2) {
       this.turnsInFullTurn = 0;
       this.turnNumber += 1;
     }
 
-    // Verificar límite de turnos completos
     if (this.turnNumber > this.config.maxTurnos) {
       const l1 = this.players[1].life;
       const l2 = this.players[2].life;
@@ -424,11 +470,25 @@ export class Game {
       else if (l2 > l1) winner = 2;
       else reason = 'draw';
       this.endGame({ winner, reason });
-      return attackResult;
+      return;
     }
 
     this.startTurn(this.activePlayer);
-    return attackResult;
+  }
+
+  /**
+   * Si el jugador tiene una skill en estado 'active', la manda al fondo del
+   * deck. Usado al cierre del turno (las activas se desgastan).
+   */
+  consumeActiveSkill(playerId: PlayerId): void {
+    const p = this.players[playerId];
+    if (!p.skill) return;
+    if (p.skill.state !== 'active') return;
+    this.log(
+      `  P${playerId}'s ${p.skill.card.name} fades (active skill consumed).`,
+    );
+    this.sendToBottom(playerId, p.skill.card);
+    p.skill = null;
   }
 
   endGame({ winner, reason }: { winner: PlayerId | null; reason: GameOverReason }): void {
@@ -439,7 +499,7 @@ export class Game {
     };
     this.gameOver = { winner, reason, stats };
     let msg = '';
-    if (reason === 'life') msg = `🏆 Player ${winner} wins by life reduction to 0.`;
+    if (reason === 'life') msg = `🏆 Player ${winner} wins by reducing rival life to 0.`;
     else if (reason === 'turnLimit')
       msg = `🏆 Player ${winner} wins by turn limit (more life remaining).`;
     else if (reason === 'draw') msg = `🤝 Technical draw by turn limit with equal life.`;
@@ -454,7 +514,6 @@ export class Game {
     });
   }
 
-  /** Serializa el estado a JSON-safe (para persistir en Firebase). */
   serialize(): SerializedGameState {
     return {
       config: this.config,
@@ -474,17 +533,31 @@ export class Game {
     };
   }
 
-  /** Reconstruye una instancia Game a partir del serializado de Firebase. */
   static fromSerialized(data: SerializedGameState): Game {
     const game = Object.create(Game.prototype) as Game;
-    game.config = data.config;
+    game.config = {
+      vidaInicial: data.config?.vidaInicial ?? 20,
+      maxTurnos: data.config?.maxTurnos ?? 20,
+      forceP1Start: data.config?.forceP1Start ?? false,
+      attacksPerTurn: data.config?.attacksPerTurn ?? DEFAULT_ATTACKS_PER_TURN,
+    };
     game.phase = data.phase;
     game.activePlayer = data.activePlayer;
     game.turnNumber = data.turnNumber;
     game.turnsInFullTurn = data.turnsInFullTurn ?? 0;
     game.combatLog = data.combatLog ?? [];
     game.setupState = data.setupState;
-    game.turnState = data.turnState;
+    game.turnState = data.turnState
+      ? {
+          isReplacingSkill: !!data.turnState.isReplacingSkill,
+          skillReplacedThisTurn: !!data.turnState.skillReplacedThisTurn,
+          drawnThisTurn: !!data.turnState.drawnThisTurn,
+          skillPlacedThisTurn: !!data.turnState.skillPlacedThisTurn,
+          attacksRemaining:
+            data.turnState.attacksRemaining ?? game.config.attacksPerTurn,
+          cardsAttackedThisTurn: data.turnState.cardsAttackedThisTurn ?? [],
+        }
+      : null;
     game.players = {
       1: deserializePlayer(data.players[1]),
       2: deserializePlayer(data.players[2]),
@@ -502,23 +575,31 @@ function serializePlayer(p: PlayerState): PlayerState {
     life: p.life,
     deck: p.deck ?? [],
     hand: p.hand ?? [],
-    frontLine: p.frontLine,
-    rearGuard: p.rearGuard,
+    units: padUnits(p.units),
     skill: p.skill,
     pendingEffects: p.pendingEffects ?? [],
   };
 }
 
-function deserializePlayer(d: PlayerState): PlayerState {
+function deserializePlayer(d: PlayerState | undefined): PlayerState {
+  if (!d) return createPlayer([], 20);
   return {
     life: d.life,
     deck: d.deck ?? [],
     hand: d.hand ?? [],
-    frontLine: d.frontLine,
-    rearGuard: d.rearGuard,
-    skill: d.skill,
+    units: padUnits(d.units),
+    skill: d.skill ?? null,
     pendingEffects: d.pendingEffects ?? [],
   };
+}
+
+/** Asegura que el array de units tenga exactamente UNIT_SLOTS elementos. */
+function padUnits(units: (UnitCard | null)[] | undefined): (UnitCard | null)[] {
+  const result: (UnitCard | null)[] = [];
+  for (let i = 0; i < UNIT_SLOTS; i++) {
+    result.push(units?.[i] ?? null);
+  }
+  return result;
 }
 
 function createPlayer(deck: Card[], vidaInicial: number): PlayerState {
@@ -526,22 +607,22 @@ function createPlayer(deck: Card[], vidaInicial: number): PlayerState {
     life: vidaInicial,
     deck: [...deck],
     hand: [],
-    frontLine: null,
-    rearGuard: null,
+    units: Array.from({ length: UNIT_SLOTS }, () => null),
     skill: null,
     pendingEffects: [],
   };
 }
 
-// Re-exports para que tests puedan importar tipos auxiliares.
-export type { PlayerSkill, UnitCard, SkillCard, PendingEffect };
+function slotRefEquals(a: SlotRef, b: SlotRef): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'unit' && b.kind === 'unit') return a.index === b.index;
+  return true;
+}
 
-/**
- * Normaliza un SerializedGameState potencialmente "corrupto" (Firebase RTDB
- * elimina valores nulos y arrays vacíos al persistir, así que campos como
- * `selection: {1: null, 2: null}` desaparecen). Hace un roundtrip por
- * Game.fromSerialized().serialize() que rellena todos los defaults.
- */
+// Re-exports
+export type { PlayerSkill, UnitCard, SkillCard };
+
+/** Helper público — normalización para el listener de Firebase. */
 export function normalizeSerializedState(data: SerializedGameState): SerializedGameState {
   return Game.fromSerialized(data).serialize();
 }

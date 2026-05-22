@@ -1,347 +1,523 @@
 // ============================================================================
-// Resolución de combate de Olympus Protocol.
-// Implementa la fórmula 2.6 + reglas de slots vacíos (2.4) + habilidades (4.2).
-// `resolveAttack` es PURA (no muta el game state): devuelve un AttackResult que
-// el motor aplica fuera (en gameEngine.endTurn). Así es testeable y portable.
+// Combate de Olympus Protocol — MECÁNICA NUEVA + SKILLS + SUPPORT ABILITIES.
+//
+// Pipeline de resolveAttack:
+//   1. Validar atacante + target + reach.
+//   2. Calcular FP bonuses (Offensive skill, Support adyacentes, trap_charge).
+//   3. Calcular AR bonuses (Defensive skill, Support adyacentes).
+//   4. Aplicar special skills (TGT-OVERRIDE = auto-destroy, ENERGY-SHLD =
+//      bloquear life damage).
+//   5. Resolver FP vs AR → destrucción + excess.
+//   6. Verificar traps (MINEFIELD activa si unit defensora destruida,
+//      TRAP-CHARGE si unit defensora sobrevive).
+//   7. Marcar skills consumidas.
+//
+// Las skills consumidas (que aparecen en result.consumedSkills) las quita
+// el motor del estado al aplicar el resultado.
 // ============================================================================
 
 import { SKILL_ID } from '../shared/cards';
 import type {
   AttackResult,
+  AttackTarget,
   PlayerId,
   PlayerState,
   SerializedGameState,
-  SkillCard,
+  UnitCard,
+  UnitSlotIndex,
+} from '../shared/types';
+import {
+  UNIT_SLOTS,
+  getAttackType,
+  getReachableSlots,
+  isValidSlotIndex,
+  otherPlayer,
 } from '../shared/types';
 
-/** Estado mínimo del juego que necesita el combate (subconjunto de SerializedGameState). */
 type CombatGameState = Pick<SerializedGameState, 'players'>;
 
+/** IDs de cartas Support con ability conocida. */
+const SUPPORT_ID = {
+  HERMES: 10, // +1 FP adyacentes
+  ATHENA: 11, // +2 AR adyacentes
+  HEPHAESTUS: 12, // taunt (sin implementar en esta fase)
+} as const;
+
+/**
+ * Resuelve un ataque individual. PURA: no muta el state, devuelve un
+ * AttackResult que el motor aplica fuera.
+ */
 export function resolveAttack(
   game: CombatGameState,
   attackerId: PlayerId,
-  defenderId: PlayerId,
+  attackerSlotIndex: UnitSlotIndex,
+  target: AttackTarget,
 ): AttackResult {
+  const defenderId: PlayerId = otherPlayer(attackerId);
   const log: string[] = [];
   const result: AttackResult = {
     log,
-    destroyed: {
-      attackerFront: false,
-      attackerRear: false,
-      defenderFront: false,
-      defenderRear: false,
-    },
+    destroyed: [],
     lifeDamage: 0,
     consumedSkills: [],
     newPendingEffects: [],
     consumedPendingEffects: [],
   };
 
-  const attacker: PlayerState = game.players[attackerId];
-  const defender: PlayerState = game.players[defenderId];
+  const attacker = game.players[attackerId];
+  const defender = game.players[defenderId];
 
-  log.push(`▶ Player ${attackerId}'s attack begins`);
-
-  // ───────────────────────────────────────────────────────────────────
-  // Fase A: skills activas (Offensive del atacante, Defensive del defensor)
-  // ───────────────────────────────────────────────────────────────────
-
-  const attackerSkill: SkillCard | null =
-    attacker.skill &&
-    attacker.skill.state === 'active' &&
-    attacker.skill.card.subtype === 'Offensive'
-      ? attacker.skill.card
-      : null;
-
-  const defenderSkill: SkillCard | null =
-    defender.skill &&
-    defender.skill.state === 'active' &&
-    defender.skill.card.subtype === 'Defensive'
-      ? defender.skill.card
-      : null;
-
-  if (attackerSkill) {
-    log.push(`⚡ Attacker activates Offensive: #${attackerSkill.id} ${attackerSkill.name}`);
-    result.consumedSkills.push({ playerId: attackerId, skillId: attackerSkill.id });
-  }
-  if (defenderSkill) {
-    log.push(`🛡 Defender activates Defensive: #${defenderSkill.id} ${defenderSkill.name}`);
-    result.consumedSkills.push({ playerId: defenderId, skillId: defenderSkill.id });
+  const attackerCard = attacker.units[attackerSlotIndex];
+  if (!attackerCard) {
+    log.push(`⚠ Invalid attack: no unit in slot ${attackerSlotIndex} of attacker.`);
+    return result;
   }
 
-  // ───────────────────────────────────────────────────────────────────
-  // Fase B: modificadores
-  // ───────────────────────────────────────────────────────────────────
-
-  const aMods = {
-    frontFirepowerBonus: 0,
-    bypassRearArmor: false,
-    autoDestroyFront: false,
-    doubleAttack: false,
-  };
-  const dMods = {
-    frontArmorBonus: 0,
-    rearArmorBonus: 0,
-    blockLifeDamage: false,
-    rearInvulnerable: false,
-  };
-
-  if (attackerSkill) {
-    if (attackerSkill.id === SKILL_ID.REACTOR_OVERLOAD) aMods.frontFirepowerBonus += 3;
-    if (attackerSkill.id === SKILL_ID.EMP_PULSE) aMods.bypassRearArmor = true;
-    if (attackerSkill.id === SKILL_ID.TARGETING_OVERRIDE) aMods.autoDestroyFront = true;
-    if (attackerSkill.id === SKILL_ID.DOUBLE_SHOT) aMods.doubleAttack = true;
+  const attackType = getAttackType(attackerCard.subtype);
+  if (attackType === null) {
+    log.push(`⚠ ${attackerCard.name} is Support — cannot attack.`);
+    return result;
   }
-  if (defenderSkill) {
-    if (defenderSkill.id === SKILL_ID.ENERGY_SHIELD) dMods.blockLifeDamage = true;
-    if (defenderSkill.id === SKILL_ID.REINFORCEMENT_PROTOCOL) {
-      dMods.frontArmorBonus += 2;
-      dMods.rearArmorBonus += 2;
+
+  // ─── Validar reach ────────────────────────────────────────────────
+  const reachable = getReachableSlots(attackType, attackerSlotIndex);
+
+  // ─── Validar taunt (HEPHAESTUS) ───────────────────────────────────
+  // Si HEPHAESTUS está en reach, el atacante DEBE apuntar a HEPHAESTUS.
+  const tauntSlot = findTauntInReach(defender, reachable);
+  if (tauntSlot !== null && !(target.kind === 'unit' && target.index === tauntSlot)) {
+    log.push(
+      `⚠ HEPHAESTUS taunt forces attacker to target slot ${tauntSlot}.`,
+    );
+    return result;
+  }
+
+  if (target.kind === 'unit') {
+    if (!reachable.includes(target.index)) {
+      log.push(
+        `⚠ Target slot ${target.index} out of reach for ${attackerCard.name} (${attackType}).`,
+      );
+      return result;
     }
-    if (defenderSkill.id === SKILL_ID.EMERGENCY_REPULSORS) dMods.rearInvulnerable = true;
-  }
-
-  // Trap Charge pendiente del atacante: +5 Firepower a Front Line en este ataque
-  const trapChargeIdx = attacker.pendingEffects.findIndex((e) => e.type === 'trap_charge');
-  if (trapChargeIdx >= 0) {
-    if (attacker.frontLine) {
-      aMods.frontFirepowerBonus += 5;
-      log.push(`💥 Attacker's pending Trap Charge: +5 Firepower to Front Line`);
-    } else {
-      log.push(`⚠ Attacker's pending Trap Charge lost (Front Line empty)`);
+    const victim = defender.units[target.index];
+    if (!victim) {
+      log.push(`⚠ Target slot ${target.index} is empty. Use { kind: 'life' } instead.`);
+      return result;
     }
-    result.consumedPendingEffects.push({
-      playerId: attackerId,
-      type: 'trap_charge',
+    return resolveUnitAttack({
+      game,
+      attackerCard,
+      victim,
+      attackerId,
+      defenderId,
+      attackerSlot: attackerSlotIndex,
+      victimSlot: target.index,
     });
   }
 
-  // ───────────────────────────────────────────────────────────────────
-  // Fase C: ejecutar el ataque (1 o 2 pases si Double Shot)
-  // ───────────────────────────────────────────────────────────────────
-
-  const attackPasses = aMods.doubleAttack ? 2 : 1;
-
-  for (let pass = 1; pass <= attackPasses; pass++) {
-    if (attackPasses > 1) log.push(`━━ Pass ${pass}/${attackPasses} (Double Shot) ━━`);
-
-    // Estado del tablero ANTES de este pase (considerando destrucciones previas).
-    const aFront = result.destroyed.attackerFront ? null : attacker.frontLine;
-    const aRear = result.destroyed.attackerRear ? null : attacker.rearGuard;
-    const dFront = result.destroyed.defenderFront ? null : defender.frontLine;
-
-    // ─── Step 1: Front Line vs Front Line ───
-    let excess = 0;
-    let step1Ended = false;
-
-    if (!aFront && !aRear) {
-      log.push(`⚠ Case C: both attacker slots empty → null attack`);
-      step1Ended = true;
-    } else if (!aFront && aRear) {
-      // Case A: Rear Guard asume el rol del Step 1
-      log.push(`▸ Case A: Attacker Front Line empty. Rear Guard takes Step 1 role.`);
-      const aRearFP = aRear.firepower; // Case A: sin buffs de Front Line
-      const dFrontArmor = dFront ? dFront.armor + dMods.frontArmorBonus : 0;
-      log.push(
-        `▸ Step 1: Attacker Rear Guard FP ${aRearFP} vs Defender Front Line Armor ${dFrontArmor}`,
-      );
-      const diff1 = aRearFP - dFrontArmor;
-      if (diff1 <= 0) {
-        log.push(
-          `  diff1 = ${diff1} → no card destroyed (Rear Guard does not expose itself). End of attack.`,
-        );
-        step1Ended = true;
-      } else {
-        log.push(`  diff1 = ${diff1} → Defender Front Line destroyed. Excess = ${diff1}`);
-        if (dFront) result.destroyed.defenderFront = true;
-        excess = diff1;
-        // En Case A el RG ya cumplió su rol → no aporta más en Step 2.
-      }
-    } else if (aFront) {
-      // Caso normal o Case B: Attacker Front Line existe.
-      const aFrontFP = aFront.firepower + aMods.frontFirepowerBonus;
-      const dFrontArmor = dFront ? dFront.armor + dMods.frontArmorBonus : 0;
-
-      if (aMods.autoDestroyFront && dFront) {
-        log.push(
-          `▸ Step 1: Targeting Override → Defender Front Line auto-destroyed. Attacker survives. No excess.`,
-        );
-        result.destroyed.defenderFront = true;
-        step1Ended = true;
-      } else if (!dFront) {
-        log.push(
-          `▸ Step 1: Defender Front Line empty (Armor 0). Attacker FP ${aFrontFP} passes through as excess.`,
-        );
-        excess = aFrontFP;
-      } else {
-        log.push(
-          `▸ Step 1: Attacker Front Line FP ${aFrontFP} vs Defender Front Line Armor ${dFrontArmor}`,
-        );
-        const diff1 = aFrontFP - dFrontArmor;
-        if (diff1 < 0) {
-          log.push(`  diff1 = ${diff1} → Attacker Front Line destroyed. End of attack.`);
-          result.destroyed.attackerFront = true;
-          step1Ended = true;
-        } else if (diff1 === 0) {
-          log.push(`  diff1 = 0 → both Front Lines destroyed. End of attack.`);
-          result.destroyed.attackerFront = true;
-          result.destroyed.defenderFront = true;
-          step1Ended = true;
-        } else {
-          log.push(`  diff1 = ${diff1} → Defender Front Line destroyed. Excess = ${diff1}`);
-          result.destroyed.defenderFront = true;
-          excess = diff1;
-
-          // Minefield del defensor: se activa cuando el atacante destruye su FL.
-          if (
-            defender.skill &&
-            defender.skill.card.id === SKILL_ID.MINEFIELD &&
-            defender.skill.state === 'hidden'
-          ) {
-            if (
-              attacker.skill &&
-              attacker.skill.card.id === SKILL_ID.CYBERATTACK &&
-              attacker.skill.state === 'hidden'
-            ) {
-              log.push(`🚫 Attacker's Cyberattack cancels Defender's Minefield before it applies`);
-              result.consumedSkills.push({
-                playerId: attackerId,
-                skillId: SKILL_ID.CYBERATTACK,
-              });
-              result.consumedSkills.push({
-                playerId: defenderId,
-                skillId: SKILL_ID.MINEFIELD,
-              });
-            } else {
-              log.push(
-                `💣 Defender's Minefield activates: Attacker Front Line also destroyed, excess nullified`,
-              );
-              result.destroyed.attackerFront = true;
-              excess = 0;
-              result.consumedSkills.push({
-                playerId: defenderId,
-                skillId: SKILL_ID.MINEFIELD,
-              });
-              step1Ended = true;
-            }
-          }
-        }
-      }
-    }
-
-    // ─── Step 2: Rear Guard / Life ───
-    const canDoStep2 = !step1Ended && (excess > 0 || (excess === 0 && (aRear || aFront)));
-    if (canDoStep2) {
-      // EMP Pulse: si el atacante destruyó la FL defensora, excess va directo a vida
-      // ignorando la Armor del RG.
-      if (aMods.bypassRearArmor && excess > 0 && result.destroyed.defenderFront) {
-        log.push(
-          `▸ Step 2: EMP Pulse → excess ${excess} ignores Defender Rear Guard Armor and goes directly to life`,
-        );
-        result.lifeDamage += excess;
-      } else {
-        // Firepower que aporta el RG del atacante
-        let aRearFP = 0;
-        if (aRear && aFront) {
-          aRearFP = aRear.firepower;
-        } else if (aRear && !aFront) {
-          // Case A: el RG ya atacó en Step 1, no vuelve a atacar.
-          aRearFP = 0;
-        } else if (!aRear && aFront) {
-          aRearFP = 0;
-          log.push(`▸ Case B: Attacker Rear Guard empty (Firepower 0)`);
-        }
-
-        const attackOnRear = aRearFP + excess;
-
-        if (attackOnRear === 0) {
-          // Nada que atacar
-        } else if (dMods.rearInvulnerable) {
-          log.push(
-            `▸ Step 2: Emergency Repulsors → Defender Rear Guard invulnerable, attack (${attackOnRear}) nullified`,
-          );
-        } else if (!defender.rearGuard) {
-          log.push(
-            `▸ Step 2: Defender Rear Guard empty (Armor 0). attackOnRear ${attackOnRear} passes through to life.`,
-          );
-          result.lifeDamage += attackOnRear;
-        } else {
-          const dRearArmor = defender.rearGuard.armor + dMods.rearArmorBonus;
-          log.push(
-            `▸ Step 2: attackOnRear ${attackOnRear} (RG ${aRearFP} + excess ${excess}) vs Defender Rear Guard Armor ${dRearArmor}`,
-          );
-          const diff2 = attackOnRear - dRearArmor;
-          if (diff2 < 0) {
-            log.push(
-              `  diff2 = ${diff2} → Defender Rear Guard survives. Attacker does not self-destruct. End of attack.`,
-            );
-          } else if (diff2 === 0) {
-            log.push(`  diff2 = 0 → Defender Rear Guard destroyed. No life damage.`);
-            result.destroyed.defenderRear = true;
-          } else {
-            log.push(`  diff2 = ${diff2} → Defender Rear Guard destroyed. Life damage: ${diff2}`);
-            result.destroyed.defenderRear = true;
-            result.lifeDamage += diff2;
-          }
-        }
-      }
-    }
-
-    if (attackPasses > 1 && pass === 1) {
-      log.push(`━━ End of pass 1, starting pass 2 with original Firepower ━━`);
-    }
+  // target.kind === 'life'
+  if (!isLifeAttackValid(attackType, attackerSlotIndex, defender)) {
+    log.push(
+      `⚠ Attack to life invalid: ${attackerCard.name} still has a valid unit target in reach.`,
+    );
+    return result;
   }
 
-  // ───────────────────────────────────────────────────────────────────
-  // Fase D: Energy Shield bloquea daño a vida
-  // ───────────────────────────────────────────────────────────────────
-  if (dMods.blockLifeDamage && result.lifeDamage > 0) {
-    log.push(`🛡 Energy Shield blocks ${result.lifeDamage} points of life damage`);
-    result.lifeDamage = 0;
-  }
+  // Ataque a vida — calcular FP con bonuses
+  const { fpBonus, attackerSkillUsed, trapChargeUsed } = computeAttackerBonuses(
+    attacker,
+    attackerSlotIndex,
+    attackerCard,
+  );
+  const totalFp = attackerCard.firepower + fpBonus;
 
-  // ───────────────────────────────────────────────────────────────────
-  // Fase E: Trap Charge del defensor — si su FL sobrevivió el ataque
-  // ───────────────────────────────────────────────────────────────────
-  if (
-    defender.skill &&
-    defender.skill.card.id === SKILL_ID.TRAP_CHARGE &&
-    defender.skill.state === 'hidden'
-  ) {
-    const frontSurvived = !!defender.frontLine && !result.destroyed.defenderFront;
-    if (frontSurvived) {
-      if (
-        attacker.skill &&
-        attacker.skill.card.id === SKILL_ID.CYBERATTACK &&
-        attacker.skill.state === 'hidden'
-      ) {
-        log.push(`🚫 Attacker's Cyberattack cancels Defender's Trap Charge before it applies`);
-        result.consumedSkills.push({
-          playerId: attackerId,
-          skillId: SKILL_ID.CYBERATTACK,
-        });
-        result.consumedSkills.push({
-          playerId: defenderId,
-          skillId: SKILL_ID.TRAP_CHARGE,
-        });
-      } else {
-        log.push(
-          `⚡ Defender's Trap Charge activates: +5 Firepower on next attack (deferred effect)`,
-        );
-        result.consumedSkills.push({
-          playerId: defenderId,
-          skillId: SKILL_ID.TRAP_CHARGE,
-        });
-        result.newPendingEffects.push({
-          playerId: defenderId,
-          type: 'trap_charge',
-          value: 5,
-        });
-      }
-    }
-  }
+  // ¿Defender tiene ENERGY-SHLD activo?
+  const defSkill =
+    defender.skill && defender.skill.state === 'active' ? defender.skill.card : null;
+  const blockLife =
+    defSkill !== null && defSkill.id === SKILL_ID.ENERGY_SHIELD;
 
-  log.push(`▶ Attack finished. Life damage: ${result.lifeDamage}`);
+  let lifeDamage = totalFp;
+  log.push(
+    `▶ ${attackerCard.name} (slot ${attackerSlotIndex}, ${attackType}, FP ${attackerCard.firepower}${fpBonus !== 0 ? `+${fpBonus}` : ''}) attacks life of P${defenderId}.`,
+  );
+  if (blockLife) {
+    log.push(`🛡 P${defenderId}'s Energy Shield blocks ${lifeDamage} life damage.`);
+    lifeDamage = 0;
+    result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_ID.ENERGY_SHIELD });
+  } else {
+    log.push(`  ${lifeDamage} damage → life P${defenderId}.`);
+  }
+  result.lifeDamage = lifeDamage;
+
+  // Marcar skills/effects usados
+  if (attackerSkillUsed) result.consumedSkills.push({ playerId: attackerId, skillId: attackerSkillUsed });
+  if (trapChargeUsed) result.consumedPendingEffects.push({ playerId: attackerId, type: 'trap_charge' });
+  // Las habilidades pasivas de Support (HERMES adyacente) no se consumen.
 
   return result;
 }
+
+// ─── Resolución de ataque unit → unit ────────────────────────────────────
+
+interface ResolveUnitAttackParams {
+  game: CombatGameState;
+  attackerCard: UnitCard;
+  victim: UnitCard;
+  attackerId: PlayerId;
+  defenderId: PlayerId;
+  attackerSlot: UnitSlotIndex;
+  victimSlot: UnitSlotIndex;
+}
+
+function resolveUnitAttack({
+  game,
+  attackerCard,
+  victim,
+  attackerId,
+  defenderId,
+  attackerSlot,
+  victimSlot,
+}: ResolveUnitAttackParams): AttackResult {
+  const log: string[] = [];
+  const result: AttackResult = {
+    log,
+    destroyed: [],
+    lifeDamage: 0,
+    consumedSkills: [],
+    newPendingEffects: [],
+    consumedPendingEffects: [],
+  };
+
+  const attacker = game.players[attackerId];
+  const defender = game.players[defenderId];
+
+  // Calcular bonuses
+  const aBon = computeAttackerBonuses(attacker, attackerSlot, attackerCard);
+  const dBon = computeDefenderBonuses(defender, victimSlot, victim);
+
+  // ─── TGT-OVERRIDE: auto-destruye sin importar AR ─────────────────
+  const attackerSkill =
+    attacker.skill && attacker.skill.state === 'active' ? attacker.skill.card : null;
+  const isAutoDestroy =
+    attackerSkill !== null && attackerSkill.id === SKILL_ID.TARGETING_OVERRIDE;
+
+  if (isAutoDestroy) {
+    log.push(
+      `▶ ${attackerCard.name} → ${victim.name}: 🎯 TARGETING-OVERRIDE auto-destroys target.`,
+    );
+    // Si el defensor tiene REPULSORS activo, anula incluso el auto-destroy.
+    const defSkillActive =
+      defender.skill && defender.skill.state === 'active' ? defender.skill.card : null;
+    if (defSkillActive !== null && defSkillActive.id === SKILL_ID.EMERGENCY_REPULSORS) {
+      log.push(
+        `🛡 P${defenderId}'s REPULSORS nullifies TARGETING-OVERRIDE: ${victim.name} survives.`,
+      );
+      result.consumedSkills.push({ playerId: attackerId, skillId: SKILL_ID.TARGETING_OVERRIDE });
+      result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_ID.EMERGENCY_REPULSORS });
+      return result;
+    }
+    result.destroyed.push({ playerId: defenderId, slotIndex: victimSlot });
+    result.consumedSkills.push({ playerId: attackerId, skillId: SKILL_ID.TARGETING_OVERRIDE });
+    // Aun así verificar traps del defensor
+    checkDefenderTraps(result, defender, defenderId, attacker, attackerId, attackerSlot, victimSlot, true);
+    return result;
+  }
+
+  const fp = attackerCard.firepower + aBon.fpBonus;
+  const effectiveAr = aBon.ignoreArmor ? 0 : victim.armor + dBon.arBonus;
+
+  log.push(
+    `▶ ${attackerCard.name} (FP ${attackerCard.firepower}${aBon.fpBonus !== 0 ? `+${aBon.fpBonus}` : ''}) vs ${victim.name} (AR ${aBon.ignoreArmor ? '0 [EMP]' : `${victim.armor}${dBon.arBonus !== 0 ? `+${dBon.arBonus}` : ''}`})`,
+  );
+
+  const diff = fp - effectiveAr;
+  let victimDestroyed = false;
+  let attackerDestroyed = false;
+
+  if (diff > 0) {
+    if (dBon.immuneToDestroy) {
+      log.push(
+        `🛡 P${defenderId}'s REPULSORS protects ${victim.name}: not destroyed (diff ${diff} nullified).`,
+      );
+      // El defensor sobrevive, no se inflinge daño a vida.
+    } else {
+      log.push(`  diff ${diff} → ${victim.name} destroyed. Excess ${diff} → life P${defenderId}.`);
+      if (isValidSlotIndex(victimSlot)) {
+        result.destroyed.push({ playerId: defenderId, slotIndex: victimSlot });
+      }
+      victimDestroyed = true;
+
+      // ¿ENERGY-SHLD bloquea el life damage?
+      const defSkill =
+        defender.skill && defender.skill.state === 'active' ? defender.skill.card : null;
+      if (defSkill !== null && defSkill.id === SKILL_ID.ENERGY_SHIELD) {
+        log.push(`🛡 P${defenderId}'s Energy Shield blocks ${diff} life damage.`);
+        result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_ID.ENERGY_SHIELD });
+      } else {
+        result.lifeDamage = diff;
+      }
+    }
+  } else if (diff === 0) {
+    if (dBon.immuneToDestroy) {
+      log.push(`🛡 P${defenderId}'s REPULSORS protects ${victim.name}. Attacker still destroyed (diff 0).`);
+      result.destroyed.push({ playerId: attackerId, slotIndex: attackerSlot });
+      attackerDestroyed = true;
+    } else {
+      log.push(`  diff 0 → both destroyed.`);
+      result.destroyed.push({ playerId: attackerId, slotIndex: attackerSlot });
+      result.destroyed.push({ playerId: defenderId, slotIndex: victimSlot });
+      attackerDestroyed = true;
+      victimDestroyed = true;
+    }
+  } else {
+    log.push(`  diff ${diff} → ${attackerCard.name} destroyed. ${victim.name} survives.`);
+    result.destroyed.push({ playerId: attackerId, slotIndex: attackerSlot });
+    attackerDestroyed = true;
+  }
+
+  // Marcar skills/effects consumidos
+  if (aBon.attackerSkillUsed)
+    result.consumedSkills.push({ playerId: attackerId, skillId: aBon.attackerSkillUsed });
+  if (dBon.defenderSkillUsed)
+    result.consumedSkills.push({ playerId: defenderId, skillId: dBon.defenderSkillUsed });
+  if (aBon.trapChargeUsed)
+    result.consumedPendingEffects.push({ playerId: attackerId, type: 'trap_charge' });
+
+  // ─── Traps del defensor ──────────────────────────────────────────
+  checkDefenderTraps(
+    result,
+    defender,
+    defenderId,
+    attacker,
+    attackerId,
+    attackerSlot,
+    victimSlot,
+    victimDestroyed,
+  );
+
+  // Si MINEFIELD activó y aún no marcamos al atacante destruido, hacerlo
+  // (checkDefenderTraps puede haber añadido un destroyed para el atacante).
+  void attackerDestroyed;
+
+  return result;
+}
+
+// ─── Cálculo de bonuses ─────────────────────────────────────────────────
+
+interface AttackerBonusInfo {
+  fpBonus: number;
+  /** ID de skill ofensiva que se usó (si alguna). */
+  attackerSkillUsed: number | null;
+  /** True si trap_charge pendingEffect se consumió. */
+  trapChargeUsed: boolean;
+  /** True si EMP-PULSE está activo (atacante ignora AR). */
+  ignoreArmor: boolean;
+}
+
+function computeAttackerBonuses(
+  attacker: PlayerState,
+  attackerSlot: UnitSlotIndex,
+  attackerCard: UnitCard,
+): AttackerBonusInfo {
+  let fpBonus = 0;
+  let attackerSkillUsed: number | null = null;
+  let trapChargeUsed = false;
+  let ignoreArmor = false;
+
+  // Offensive skill
+  const skill = attacker.skill && attacker.skill.state === 'active' ? attacker.skill.card : null;
+  if (skill !== null) {
+    if (skill.id === SKILL_ID.REACTOR_OVERLOAD) {
+      fpBonus += 3;
+      attackerSkillUsed = SKILL_ID.REACTOR_OVERLOAD;
+    } else if (skill.id === SKILL_ID.EMP_PULSE) {
+      ignoreArmor = true;
+      attackerSkillUsed = SKILL_ID.EMP_PULSE;
+    }
+    // TGT-OVERRIDE se maneja en otro path (auto-destroy)
+    // DOUBLE-SHOT se maneja en gameEngine.startTurn (atacante extra)
+  }
+
+  // Support adyacentes (HERM35: +1 FP)
+  for (const adj of adjacentSlots(attackerSlot)) {
+    const adjCard = attacker.units[adj];
+    if (adjCard && adjCard.id === SUPPORT_ID.HERMES) {
+      fpBonus += 1;
+    }
+  }
+
+  // Pending trap_charge: +5 FP
+  const tc = attacker.pendingEffects.find((e) => e.type === 'trap_charge');
+  if (tc) {
+    fpBonus += tc.value ?? 5;
+    trapChargeUsed = true;
+  }
+
+  void attackerCard;
+  return { fpBonus, attackerSkillUsed, trapChargeUsed, ignoreArmor };
+}
+
+interface DefenderBonusInfo {
+  arBonus: number;
+  defenderSkillUsed: number | null;
+  /** True si REPULSORS está activo (defensor inmune a destrucción). */
+  immuneToDestroy: boolean;
+}
+
+function computeDefenderBonuses(
+  defender: PlayerState,
+  victimSlot: UnitSlotIndex,
+  victimCard: UnitCard,
+): DefenderBonusInfo {
+  let arBonus = 0;
+  let defenderSkillUsed: number | null = null;
+  let immuneToDestroy = false;
+
+  // Defensive skill
+  const skill = defender.skill && defender.skill.state === 'active' ? defender.skill.card : null;
+  if (skill !== null) {
+    if (skill.id === SKILL_ID.REINFORCEMENT_PROTOCOL) {
+      arBonus += 2;
+      defenderSkillUsed = SKILL_ID.REINFORCEMENT_PROTOCOL;
+    } else if (skill.id === SKILL_ID.EMERGENCY_REPULSORS) {
+      immuneToDestroy = true;
+      defenderSkillUsed = SKILL_ID.EMERGENCY_REPULSORS;
+    }
+    // ENERGY-SHLD se maneja como bloqueo de life damage (no AR bonus)
+  }
+
+  // Support adyacentes (ATH3N4: +2 AR)
+  for (const adj of adjacentSlots(victimSlot)) {
+    const adjCard = defender.units[adj];
+    if (adjCard && adjCard.id === SUPPORT_ID.ATHENA) {
+      arBonus += 2;
+    }
+  }
+
+  void victimCard;
+  return { arBonus, defenderSkillUsed, immuneToDestroy };
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────
+
+function adjacentSlots(slot: UnitSlotIndex): UnitSlotIndex[] {
+  const result: UnitSlotIndex[] = [];
+  if (isValidSlotIndex(slot - 1)) result.push((slot - 1) as UnitSlotIndex);
+  if (isValidSlotIndex(slot + 1)) result.push((slot + 1) as UnitSlotIndex);
+  return result;
+}
+
+function isLifeAttackValid(
+  attackType: 'melee' | 'demolition' | 'ranged',
+  attackerSlot: UnitSlotIndex,
+  defender: PlayerState,
+): boolean {
+  const reachable = getReachableSlots(attackType, attackerSlot);
+  for (const slot of reachable) {
+    if (defender.units[slot]) return false;
+  }
+  return true;
+}
+
+/**
+ * Si HEPHAESTUS está en alguno de los slots `reachable` del defensor, devuelve
+ * su slot. En otro caso devuelve null.
+ */
+function findTauntInReach(
+  defender: PlayerState,
+  reachable: readonly UnitSlotIndex[],
+): UnitSlotIndex | null {
+  for (const slot of reachable) {
+    const card = defender.units[slot];
+    if (card && card.id === SUPPORT_ID.HEPHAESTUS) return slot;
+  }
+  return null;
+}
+
+/**
+ * Helper público para la UI: dado un atacante y el defender state, devuelve
+ * el slot al que el taunt obliga (o null si no hay taunt forzado).
+ *
+ * Si esto devuelve un valor, el Board debe restringir validAttackTargets a
+ * únicamente ese slot.
+ */
+export function getForcedTauntTarget(
+  defender: { units: (UnitCard | null)[] },
+  attackType: 'melee' | 'demolition' | 'ranged',
+  attackerSlot: UnitSlotIndex,
+): UnitSlotIndex | null {
+  const reachable = getReachableSlots(attackType, attackerSlot);
+  for (const slot of reachable) {
+    const card = defender.units[slot];
+    if (card && card.id === SUPPORT_ID.HEPHAESTUS) return slot;
+  }
+  return null;
+}
+
+/**
+ * Verifica si el defensor tiene una trap hidden que se activa con este ataque.
+ * - MINEFIELD: activa cuando una unit del defensor es destruida. Destruye al atacante.
+ * - TRAP-CHARGE: activa cuando una unit del defensor sobrevive un ataque.
+ *   Agrega pendingEffect 'trap_charge' al defensor para próximo ataque.
+ * - Si el atacante tiene CYBERATTACK hidden, cancela la trap del defensor y
+ *   ambas cartas se descartan (ambos consumedSkills).
+ */
+function checkDefenderTraps(
+  result: AttackResult,
+  defender: PlayerState,
+  defenderId: PlayerId,
+  attacker: PlayerState,
+  attackerId: PlayerId,
+  attackerSlot: UnitSlotIndex,
+  victimSlot: UnitSlotIndex,
+  victimDestroyed: boolean,
+): void {
+  const trap = defender.skill && defender.skill.state === 'hidden' ? defender.skill.card : null;
+  if (trap === null) return;
+  if (trap.subtype !== 'Trap') return;
+
+  // ¿Se cumple la condición de activación?
+  const wouldFireMinefield = trap.id === SKILL_ID.MINEFIELD && victimDestroyed;
+  const wouldFireTrapCharge =
+    trap.id === SKILL_ID.TRAP_CHARGE && !victimDestroyed && defender.units[victimSlot] !== null;
+  const willFire = wouldFireMinefield || wouldFireTrapCharge;
+
+  if (!willFire) return;
+
+  // CYBERATTACK del atacante: intercepta y cancela la trap rival.
+  const attackerTrap =
+    attacker.skill && attacker.skill.state === 'hidden' ? attacker.skill.card : null;
+  if (attackerTrap !== null && attackerTrap.id === SKILL_ID.CYBERATTACK) {
+    result.log.push(
+      `🕷 P${attackerId}'s CYBERATTACK cancels P${defenderId}'s ${trap.name}. Both discarded.`,
+    );
+    result.consumedSkills.push({ playerId: attackerId, skillId: SKILL_ID.CYBERATTACK });
+    result.consumedSkills.push({ playerId: defenderId, skillId: trap.id });
+    return;
+  }
+
+  if (wouldFireMinefield) {
+    result.log.push(`💣 P${defenderId}'s MINEFIELD activates: attacker also destroyed.`);
+    // Si el atacante no está ya destruido, lo destruimos
+    const alreadyDestroyed = result.destroyed.some(
+      (d) => d.playerId === attackerId && d.slotIndex === attackerSlot,
+    );
+    if (!alreadyDestroyed) {
+      result.destroyed.push({ playerId: attackerId, slotIndex: attackerSlot });
+    }
+    result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_ID.MINEFIELD });
+    return;
+  }
+
+  if (wouldFireTrapCharge) {
+    result.log.push(
+      `⚡ P${defenderId}'s TRAP-CHARGE activates: +5 FP next attack (pending).`,
+    );
+    result.newPendingEffects.push({ playerId: defenderId, type: 'trap_charge', value: 5 });
+    result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_ID.TRAP_CHARGE });
+  }
+}
+
+// Helper para silenciar el unused warning de UNIT_SLOTS si TS lo detecta.
+void UNIT_SLOTS;

@@ -1,46 +1,22 @@
 .area {
-  /* fancy-border ya añade position:relative + padding:18px + isolation */
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
+  /* fancy-border añade position:relative + padding:18px + isolation */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
   background: transparent;
   border-radius: 8px;
   min-height: 0;
   overflow: hidden;
 }
 
-.slotsGrid {
-  display: grid;
-  grid-template-columns: 144px 144px;
-  grid-template-rows: 202px 202px;
-  gap: 8px;
-  align-self: start;
+.active {
+  outline: 1px solid rgba(251, 191, 36, 0.5);
+  outline-offset: -2px;
 }
 
-/* Orientación TOP: rearGuard + info arriba, frontLine + skill abajo */
-.area.orient-top .slotsGrid > :nth-child(1) {
-  grid-area: 1 / 1;
-}
-.area.orient-top .slotsGrid > :nth-child(2) {
-  grid-area: 1 / 2;
-}
-.area.orient-top .slotsGrid > :nth-child(3) {
-  grid-area: 2 / 1;
-}
-.area.orient-top .slotsGrid > :nth-child(4) {
-  grid-area: 2 / 2;
-}
-
-/* Orientación BOTTOM: frontLine + skill arriba, rearGuard + info abajo */
-.area.orient-bottom .slotsGrid > :nth-child(1) {
-  grid-area: 2 / 1;
-}
-.area.orient-bottom .slotsGrid > :nth-child(2) {
-  grid-area: 2 / 2;
-}
-.area.orient-bottom .slotsGrid > :nth-child(3) {
-  grid-area: 1 / 1;
-}
-.area.orient-bottom .slotsGrid > :nth-child(4) {
-  grid-area: 1 / 2;
+.unitsRow {
+  display: flex;
+  gap: 24px;
+  flex-shrink: 0;
 }

@@ -1,9 +1,7 @@
 .slot {
-  width: 144px;
-  height: 202px;
-  /* slot.png SIEMPRE como background — así sigue visible mientras la carta
-     anima desde fuera de pantalla y solo es cubierta cuando la carta llega
-     a su posición final. */
+  /* Tamaño global de carta (definido en Board.module.css .main). */
+  width: var(--card-w);
+  height: var(--card-h);
   background:
     url('/images/slot.png') center / contain no-repeat,
     rgba(0, 0, 0, 0.25);
@@ -15,13 +13,14 @@
   transition: all 0.2s;
   overflow: hidden;
   position: relative;
+  flex-shrink: 0;
 }
 
-.slot.empty {
+.empty {
   opacity: 0.8;
 }
 
-.slot.empty .label {
+.empty .label {
   color: var(--text-dim);
   font-size: 10px;
   font-weight: bold;
@@ -33,13 +32,35 @@
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.9);
 }
 
-.slot.highlighted {
-  outline: 2px solid var(--gold);
+/* Highlight: la carta seleccionada (de mano) puede colocarse aquí. */
+.validPlacement {
+  outline: 2px dashed var(--gold);
   outline-offset: -2px;
   box-shadow: 0 0 14px rgba(251, 191, 36, 0.5);
-  background-color: rgba(251, 191, 36, 0.08);
 }
 
-.slot.clickable {
+/* Highlight: una unidad atacante seleccionada puede pegar aquí. */
+.validTarget {
+  box-shadow: 0 0 18px #ff000080;
+  background:
+    url('/images/slot.png') center / contain no-repeat,
+    rgba(248, 113, 113, 0.15);
+}
+
+/* Highlight: esta es mi propia unidad seleccionada para atacar. */
+.selectedAttacker {
+  box-shadow: 0 0 18px #fbbf2480;
+}
+
+.clickable {
   cursor: var(--cursor-pointer), pointer;
+}
+
+/* ─── Estado dimmed (modo ataque: slot no relevante) ───────────────
+   Filtra TODO el contenido del slot (carta + fondo). Solo se aplica
+   a slots ocupados — los vacíos quedan sin cambio. */
+.dimmed {
+  filter: brightness(0.28) saturate(0.15);
+  pointer-events: none;
+  transition: filter 0.2s;
 }

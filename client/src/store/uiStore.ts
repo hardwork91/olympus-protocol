@@ -1,35 +1,49 @@
 // ============================================================================
 // uiStore — estado de UI del cliente (Zustand).
-// IMPORTANTE: el estado autoritativo del juego vive en Firebase, no acá.
-// Este store guarda solo cosas que NO se sincronizan con el rival:
-//   - selección de carta local (la que se sí broadcastea va por gameService)
-//   - flag de animación (mientras endTurn está procesando)
-//   - mensajes de error transitorios
+// IMPORTANTE: el estado autoritativo del juego vive en Firebase. Este store
+// solo guarda lo que NO se sincroniza con el rival:
+//   - selection: modo de interacción actual (placing una carta de mano,
+//     o atacando con una unidad propia). Mutuamente exclusivos.
+//   - isAnimating: flag mientras se procesa un ataque.
+//   - errorMessage: toast transitorio.
 // ============================================================================
 
+import type { Card, UnitSlotIndex } from '@shared/types';
 import { create } from 'zustand';
 
-interface UIStore {
-  /** ID de la carta seleccionada por el jugador local. */
-  selectedInstanceId: string | null;
-  setSelectedInstanceId: (id: string | null) => void;
+/** Selección actual del jugador local — modo placement o modo attack. */
+export type LocalSelection =
+  | null
+  | { kind: 'hand'; instanceId: string }
+  | { kind: 'attacker'; slotIndex: UnitSlotIndex };
 
-  /** True mientras endTurn está animando el combate. Bloquea otras acciones. */
+interface UIStore {
+  selection: LocalSelection;
+  setSelection: (sel: LocalSelection) => void;
+  clearSelection: () => void;
+
   isAnimating: boolean;
   setIsAnimating: (v: boolean) => void;
 
-  /** Mensaje de error transitorio (toast). */
   errorMessage: string | null;
   setErrorMessage: (msg: string | null) => void;
+
+  /** Carta que el jugador local tiene bajo el cursor (para el preview del sidebar izquierdo). */
+  hoveredCard: Card | null;
+  setHoveredCard: (card: Card | null) => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
-  selectedInstanceId: null,
-  setSelectedInstanceId: (id) => set({ selectedInstanceId: id }),
+  selection: null,
+  setSelection: (sel) => set({ selection: sel }),
+  clearSelection: () => set({ selection: null }),
 
   isAnimating: false,
   setIsAnimating: (v) => set({ isAnimating: v }),
 
   errorMessage: null,
   setErrorMessage: (msg) => set({ errorMessage: msg }),
+
+  hoveredCard: null,
+  setHoveredCard: (card) => set({ hoveredCard: card }),
 }));

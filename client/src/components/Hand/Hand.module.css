@@ -1,15 +1,15 @@
 .hand {
   display: flex;
-  gap: 6px;
-  align-items: flex-start;
+  gap: var(--card-gap, 6px);
+  align-items: center;
+  justify-content: center;
 }
 
-/* Cada slot es un container fijo (190x266) con position:relative.
-   Dentro: placeholder absoluto (fondo) + opcional card absoluta encima. */
+/* Cada slot del hand usa el mismo tamaño global que el resto del tablero. */
 .slot {
   position: relative;
-  width: 190px;
-  height: 266px;
+  width: var(--card-w);
+  height: var(--card-h);
   flex-shrink: 0;
 }
 
@@ -20,6 +20,23 @@
   border-radius: 6px;
   opacity: 0.55;
   pointer-events: none;
+}
+
+/* Mano local: background decorativo (hand.png) detrás de los slots.
+   Tamaño/posición ajustable vía CSS vars. El padding usa los valores
+   responsivos (--hand-pad-v, --hand-pad-h) definidos en Board.module.css.
+*/
+.local {
+  --hand-bg-size: 100% 100%;
+  --hand-bg-position: center;
+  --hand-bg-repeat: no-repeat;
+
+  background-image: url('/images/hand.png');
+  background-size: var(--hand-bg-size);
+  background-position: var(--hand-bg-position);
+  background-repeat: var(--hand-bg-repeat);
+  padding: var(--hand-pad-v) var(--hand-pad-h);
+  border-radius: 8px;
 }
 
 .opponent {

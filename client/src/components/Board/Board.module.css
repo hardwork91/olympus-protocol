@@ -1,14 +1,82 @@
 .app {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 340px;
+  grid-template-columns: 340px 1fr 340px;
   height: 100vh;
   gap: 6px;
   padding: 8px;
   overflow: hidden;
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   Main: 2 filas — battlefields (2/3) + hand (1/3).
+   container-type:size habilita 100cqh/100cqw para calcular el tamaño
+   de las cartas en función del área disponible.
+
+   Variables públicas (heredadas a todos los hijos):
+     --card-h:  alto de carta (responsive).
+     --card-w:  ancho = card-h × 5/7 (proporción canónica del frame).
+
+   Cálculo de --card-h: el mínimo de
+     - 1/3 de la altura del main (cada fila), menos un pequeño padding.
+     - El ancho disponible ÷ 5 (peor caso: 5 cartas en línea sin info).
+       Para battlefields con 7 elementos (info + skill + 5 units) la
+       fila usa gap pequeño y el info/skill comparten ancho. La división
+       por 5 deja margen para esos extras + gaps.
+   ────────────────────────────────────────────────────────────────── */
 .main {
+  position: relative;
+  display: grid;
+  grid-template-rows: 5fr 2fr;
+  gap: 6px;
+  min-height: 0;
+  overflow: hidden;
+  container-type: size;
+
+  /* ─── Variables globales de layout ───────────────────────────────────
+     --card-gap:   espacio entre cartas en cualquier fila.
+     --card-h:     ALTO de cualquier carta (mano + slots). Es el mismo
+                   en todo el tablero (responsive).
+     --card-w:     ancho derivado de --card-h con proporción 5:7.
+
+     Cálculo de --card-h: el mínimo de:
+       (a) Alto del battlefield. Con grid 5fr/2fr el top wrapper es 5/7
+           del main; dentro hay 2 filas → cada battlefield es 5/14 ≈
+           35.7% del main. Restamos padding interno (fancy-border).
+       (b) Alto de la hand. Con grid 5fr/2fr la fila inferior es 2/7 ≈
+           28.6% del main. Es la fila más chica → suele ser el bottleneck.
+           Restamos --hand-pad-v × 2.
+       (c) Restricción de ancho: 6 elementos por battlefield row
+           (skill + 5 units). Sin PlayerInfo, la fila tiene:
+             fancy-border: 36px · area-gap(skill↔units): 8px
+             4 gaps internos del unitsRow: 4×24 = 96px
+             Total no-carta: 140px. Las 6 cartas: 6×card_w = 30/7×card_h
+           → card_h ≤ (100cqw − 140px) × 7/30
+
+     --hand-padding: aplicado al fondo de la mano local. Usa clamp para
+     que en monitores pequeños no canibalice el alto. Override en Hand.
+     ─────────────────────────────────────────────────────────────────── */
+  --card-gap: 24px;
+  --hand-pad-v: clamp(4px, 1.5cqh, 14px);
+  --hand-pad-h: clamp(12px, 8cqw, 120px);
+
+  /* Restricción de ancho para 6 cards (skill + 5 units) en battlefield:
+       fancy-border: 36px · area-gap(skill↔units): 24px
+       4 gaps internos del unitsRow: 4×24 = 96px
+       Total no-carta: 156px. Las 6 cartas: 6×card_w = 30/7×card_h
+     → card_h ≤ (100cqw − 156px) × 7/30  */
+  --card-h: min(
+    calc(35.71cqh - 24px),
+    calc(28.57cqh - var(--hand-pad-v) * 2 - 4px),
+    calc((100cqw - 156px) * 7 / 30)
+  );
+  --card-w: calc(var(--card-h) * 5 / 7);
+}
+
+/* Fila superior: 2 battlefields apilados, cada uno 1fr.
+   position:relative para que el botón "Attack Life" pueda flotar
+   centrado entre ambos como overlay. */
+.battlefields {
   position: relative;
   display: grid;
   grid-template-rows: 1fr 1fr;
@@ -17,38 +85,41 @@
   overflow: hidden;
 }
 
-/* ─── Cuando localSeat=2: invertimos el orden visual de los PlayerArea ───
-   (P2 abajo, P1 arriba) usando la propiedad order. */
-.app[data-local-seat='2'] .main > section:nth-child(1) {
-  order: 1;
-}
-.app[data-local-seat='2'] .main > section:nth-child(2) {
-  order: 2;
-}
-
-/* ─── Attack icon (centro) ────────────────────────────────────────── */
-.attackIcon {
+/* Botón "Attack Life" — overlay flotante centrado entre rival y player. */
+.attackLifeBtn {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  pointer-events: none;
-  /* z-index 1 para sobrevivir al order:1/2 cuando seat=2 invierte paint order */
-  z-index: 1;
-  width: 150px;
-  height: 150px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  z-index: 5;
+  padding: 8px 24px;
+  background: var(--red);
+  color: var(--bg-deep);
+  border: none;
+  border-radius: 6px;
+  font-family: 'Cinzel', serif;
+  font-weight: bold;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  cursor: var(--cursor-pointer), pointer;
+  box-shadow: 0 0 14px rgba(248, 113, 113, 0.5);
+  transition: all 0.15s;
 }
-.attackIcon img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  display: block;
+.attackLifeBtn:hover {
+  transform: translate(-50%, -50%) scale(1.05);
+  box-shadow: 0 0 20px rgba(248, 113, 113, 0.8);
 }
 
-/* ─── Fly ornaments (laterales del centro) ────────────────────────── */
+/* Fila inferior: mano local. La altura total del row es 1/3 del main. */
+.handZone {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ─── Decoraciones flotantes ────────────────────────────────────────── */
 .fly {
   position: absolute;
   top: 50%;
@@ -64,7 +135,6 @@
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  display: block;
 }
 .flyRight {
   right: -13px;
@@ -75,7 +145,7 @@
   transform: translateY(-50%) scaleX(-1);
 }
 
-/* ─── Sider-header (cresta) sobre el sidebar ─────────────────────── */
+/* Decorativo que se superpone sobre el sidebar DERECHO */
 .sidebarDeco {
   position: absolute;
   top: 8px;
@@ -89,4 +159,22 @@
   width: 352px;
   height: auto;
   display: block;
+}
+
+/* Decorativo que se superpone sobre el sidebar IZQUIERDO (InfoSidebar).
+   Se espeja horizontalmente para que apunte hacia el interior del tablero. */
+.infoSidebarDeco {
+  position: absolute;
+  top: 8px;
+  left: 12px;
+  width: 340px;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+}
+.infoSidebarDeco img {
+  width: 352px;
+  height: auto;
+  display: block;
+  transform: scaleX(-1);
 }

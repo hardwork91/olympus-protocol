@@ -3,9 +3,10 @@
    ────────────────────────────────────────────────────────────────── */
 
 .card {
-  /* Tamaño BASE (cartas en slots) — relación 5:7 aprox */
-  width: 135px;
-  height: 189px;
+  /* Todas las cartas usan el tamaño global definido en Board.module.css.
+     Las variables --card-w y --card-h se heredan desde .main. */
+  width: var(--card-w);
+  height: var(--card-h);
   background: transparent;
   border: none;
   padding: 0;
@@ -19,13 +20,23 @@
   color: var(--text-light);
   transition:
     transform 0.15s,
-    box-shadow 0.15s;
+    box-shadow 0.15s,
+    filter 0.2s,
+    opacity 0.2s;
 }
 
-/* Cartas en la MANO: más grandes (proporción 5:7 ampliada) */
+/* ─── Estado dimmed (modo ataque: carta no relevante) ───────────────
+   Oscurece y desatura la carta para que destaquen solo el atacante y
+   los targets válidos. pointer-events:none elimina hover y click. */
+.card.dimmed {
+  filter: brightness(0.28) saturate(0.15);
+  pointer-events: none;
+}
+
+/* Mismo tamaño que el slot — antes la mano usaba dimensiones distintas. */
 .card.inHand {
-  width: 190px;
-  height: 266px;
+  width: var(--card-w);
+  height: var(--card-h);
 }
 
 .card.inSlot {
@@ -195,6 +206,8 @@
   mix-blend-mode: overlay;
 }
 
+/* El spotlight aplica en TODAS las cartas al hacer hover —
+   tanto las de la mano como las del campo (propias y del rival). */
 .card:hover .spotlight {
   opacity: 1;
 }

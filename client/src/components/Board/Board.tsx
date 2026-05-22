@@ -56,6 +56,7 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
   useEffect(() => {
     if (state.phase !== 'playing') return;
     const current = state.activePlayer;
+    if (current === null) return;
     if (current === prevActivePlayer.current) return;
     prevActivePlayer.current = current;
     const id = turnBannerId.current++;

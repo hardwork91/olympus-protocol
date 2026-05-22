@@ -405,7 +405,7 @@ export class Game {
     // carta sea destruida o regrese al mazo.
     for (const { playerId: pid, slotIndex, newArmor } of result.armorDamage) {
       const unit = this.players[pid].units[slotIndex];
-      if (unit) unit.armor = newArmor;
+      if (unit) (unit as { armor: number }).armor = newArmor;
     }
 
     const defenderId = otherPlayer(playerId);

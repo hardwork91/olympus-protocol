@@ -118,7 +118,7 @@ export default function ActionBar({ roomId, state, localSeat }: ActionBarProps) 
     const canReplace = game.canReplaceSkill(localSeat);
     const isReplacing = !!state.turnState?.isReplacingSkill;
     const attacksLeft = state.turnState?.attacksRemaining ?? 0;
-    const handFull = state.players[localSeat].hand.length >= 5;
+    const handFull = state.players[localSeat].hand.length >= 6;
 
     return (
       <div className={styles.bar}>

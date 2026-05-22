@@ -40,7 +40,7 @@ import { resolveAttack } from './combat';
 /** Cantidad inicial de cartas en mano para llenar el setup (5 units + 1 skill). */
 const INITIAL_HAND_SIZE = 6;
 /** Cantidad máxima de cartas en mano durante el juego (a la que se rellena por draw). */
-const PLAY_HAND_SIZE = 5;
+const PLAY_HAND_SIZE = 6;
 /** Default de ataques por turno. */
 const DEFAULT_ATTACKS_PER_TURN = 3;
 

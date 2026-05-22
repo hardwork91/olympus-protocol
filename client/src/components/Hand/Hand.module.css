@@ -27,7 +27,7 @@
    responsivos (--hand-pad-v, --hand-pad-h) definidos en Board.module.css.
 */
 .local {
-  --hand-bg-size: 100% 100%;
+  --hand-bg-size: 97% 130%;
   --hand-bg-position: center;
   --hand-bg-repeat: no-repeat;
 

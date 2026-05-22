@@ -39,7 +39,7 @@ export default function Hand({
   selectedInstanceId,
   showOpponentSelection,
   onCardClick,
-  maxSlots = 5,
+  maxSlots = 6,
   attackModeActive,
 }: HandProps) {
   const enterFromY = isLocal ? '100vh' : '-100vh';

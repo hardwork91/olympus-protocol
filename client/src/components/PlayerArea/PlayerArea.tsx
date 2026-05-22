@@ -6,7 +6,9 @@
 // aparece aquí. Recibe handlers de click ya resueltos por el Board.
 // ============================================================================
 
+import DamageFloat from '@components/DamageFloat/DamageFloat';
 import Slot from '@components/Slot/Slot';
+import { getEffectiveStats } from '@server/combat';
 import type { PlayerId, PlayerState, UnitSlotIndex } from '@shared/types';
 import { UNIT_SLOTS } from '@shared/types';
 import clsx from 'clsx';
@@ -30,6 +32,12 @@ interface PlayerAreaProps {
   onSkillSlotClick?: () => void;
   /** Hay un atacante seleccionado — dimear todo lo que no sea relevante. */
   attackModeActive?: boolean;
+  /** Slots cuyas unidades ya atacaron este turno — visual agotado, no seleccionable. */
+  exhaustedSlots?: Set<UnitSlotIndex>;
+  /** Animaciones de daño pendientes por slot (key = slotIndex). */
+  slotAnims?: Partial<Record<UnitSlotIndex, { id: number; amount: number }>>;
+  /** Animación de daño a vida (excedente o ataque directo). */
+  lifeDamageAnim?: { id: number; amount: number } | null;
 }
 
 export default function PlayerArea({
@@ -45,6 +53,9 @@ export default function PlayerArea({
   onUnitSlotClick,
   onSkillSlotClick,
   attackModeActive,
+  exhaustedSlots,
+  slotAnims,
+  lifeDamageAnim,
 }: PlayerAreaProps) {
   const skillState = player.skill?.state;
   // El rival no ve mi skill mientras esté hidden.
@@ -73,10 +84,14 @@ export default function PlayerArea({
           const isValidPlacement = validUnitPlacements.has(index);
           const isValidTarget = validAttackTargets.has(index);
           const isSelectedAttacker = selectedAttackerSlot === index;
+          const isExhausted = !!exhaustedSlots?.has(index);
+          // Exhausted: no se puede seleccionar como atacante (excluir de interactive)
           const interactive =
-            isValidPlacement || isValidTarget || (isLocal && card !== null);
+            !isExhausted && (isValidPlacement || isValidTarget || (isLocal && card !== null));
           // Dimear en modo ataque si no es ni el atacante ni un target válido
           const isDimmed = !!attackModeActive && !isSelectedAttacker && !isValidTarget;
+          // Estadísticas efectivas con bonos de Support (HERMES +1 FP, ATHENA +2 AR)
+          const effStats = getEffectiveStats(player, index);
           return (
             <Slot
               key={`u-${playerId}-${i}`}
@@ -87,9 +102,20 @@ export default function PlayerArea({
               label={`${i + 1}`}
               onClick={interactive && onUnitSlotClick ? () => onUnitSlotClick(index) : undefined}
               dimmed={isDimmed}
+              exhausted={isExhausted}
+              damageAnim={slotAnims?.[index] ?? null}
+              effectiveFp={effStats?.effectiveFp}
+              effectiveAr={effStats?.effectiveAr}
             />
           );
         })}
+
+        {/* Float de daño a vida (excedente o ataque directo) */}
+        {lifeDamageAnim && (
+          <div className={styles.lifeDamageAnchor}>
+            <DamageFloat key={lifeDamageAnim.id} amount={lifeDamageAnim.amount} />
+          </div>
+        )}
       </div>
     </section>
   );

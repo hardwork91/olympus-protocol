@@ -18,6 +18,7 @@
 
 import { SKILL_ID } from '../shared/cards';
 import type {
+  ArmorDamageRef,
   AttackResult,
   AttackTarget,
   PlayerId,
@@ -62,6 +63,7 @@ export function resolveAttack(
     consumedSkills: [],
     newPendingEffects: [],
     consumedPendingEffects: [],
+    armorDamage: [],
   };
 
   const attacker = game.players[attackerId];
@@ -187,6 +189,7 @@ function resolveUnitAttack({
     consumedSkills: [],
     newPendingEffects: [],
     consumedPendingEffects: [],
+    armorDamage: [],
   };
 
   const attacker = game.players[attackerId];
@@ -231,55 +234,68 @@ function resolveUnitAttack({
     `▶ ${attackerCard.name} (FP ${attackerCard.firepower}${aBon.fpBonus !== 0 ? `+${aBon.fpBonus}` : ''}) vs ${victim.name} (AR ${aBon.ignoreArmor ? '0 [EMP]' : `${victim.armor}${dBon.arBonus !== 0 ? `+${dBon.arBonus}` : ''}`})`,
   );
 
+  // ─── Resolución de daño (armor persistente) ─────────────────────
+  // La armor ya no se reinicia entre turnos. FP golpea la armor actual.
+  //   diff > 0  : defensor destruido, exceso → vida. Atacante sobrevive.
+  //   diff = 0  : defensor destruido exactamente. Atacante sobrevive.
+  //   diff < 0  : defensor sobrevive con armor reducida (newArmor = -diff).
+  //               El atacante siempre sobrevive.
+  // REPULSORS anula tanto la destrucción como el daño a armor.
+
   const diff = fp - effectiveAr;
   let victimDestroyed = false;
-  let attackerDestroyed = false;
 
-  if (diff > 0) {
+  if (diff >= 0) {
     if (dBon.immuneToDestroy) {
+      // REPULSORS: ataque completamente anulado
       log.push(
-        `🛡 P${defenderId}'s REPULSORS protects ${victim.name}: not destroyed (diff ${diff} nullified).`,
+        `🛡 P${defenderId}'s REPULSORS nullifies attack: ${victim.name} untouched.`,
       );
-      // El defensor sobrevive, no se inflinge daño a vida.
+      result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_ID.EMERGENCY_REPULSORS });
     } else {
-      log.push(`  diff ${diff} → ${victim.name} destroyed. Excess ${diff} → life P${defenderId}.`);
-      if (isValidSlotIndex(victimSlot)) {
-        result.destroyed.push({ playerId: defenderId, slotIndex: victimSlot });
-      }
+      // Defensor destruido
+      result.destroyed.push({ playerId: defenderId, slotIndex: victimSlot });
       victimDestroyed = true;
 
-      // ¿ENERGY-SHLD bloquea el life damage?
-      const defSkill =
-        defender.skill && defender.skill.state === 'active' ? defender.skill.card : null;
-      if (defSkill !== null && defSkill.id === SKILL_ID.ENERGY_SHIELD) {
-        log.push(`🛡 P${defenderId}'s Energy Shield blocks ${diff} life damage.`);
-        result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_ID.ENERGY_SHIELD });
+      if (diff > 0) {
+        log.push(
+          `  diff ${diff} → ${victim.name} destroyed. Excess ${diff} → life P${defenderId}.`,
+        );
+        // ¿ENERGY-SHLD bloquea el life damage?
+        const defSkill =
+          defender.skill && defender.skill.state === 'active' ? defender.skill.card : null;
+        if (defSkill !== null && defSkill.id === SKILL_ID.ENERGY_SHIELD) {
+          log.push(`🛡 P${defenderId}'s Energy Shield blocks ${diff} life damage.`);
+          result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_ID.ENERGY_SHIELD });
+        } else {
+          result.lifeDamage = diff;
+        }
       } else {
-        result.lifeDamage = diff;
+        log.push(`  diff 0 → ${victim.name} destroyed. No excess damage.`);
       }
-    }
-  } else if (diff === 0) {
-    if (dBon.immuneToDestroy) {
-      log.push(`🛡 P${defenderId}'s REPULSORS protects ${victim.name}. Attacker still destroyed (diff 0).`);
-      result.destroyed.push({ playerId: attackerId, slotIndex: attackerSlot });
-      attackerDestroyed = true;
-    } else {
-      log.push(`  diff 0 → both destroyed.`);
-      result.destroyed.push({ playerId: attackerId, slotIndex: attackerSlot });
-      result.destroyed.push({ playerId: defenderId, slotIndex: victimSlot });
-      attackerDestroyed = true;
-      victimDestroyed = true;
     }
   } else {
-    log.push(`  diff ${diff} → ${attackerCard.name} destroyed. ${victim.name} survives.`);
-    result.destroyed.push({ playerId: attackerId, slotIndex: attackerSlot });
-    attackerDestroyed = true;
+    // diff < 0: defensor sobrevive, armor reducida
+    const newArmor = -diff; // = effectiveAr - fp, siempre > 0
+    if (dBon.immuneToDestroy) {
+      // REPULSORS también bloquea el daño a armor
+      log.push(
+        `🛡 P${defenderId}'s REPULSORS nullifies attack: ${victim.name} takes no armor damage.`,
+      );
+      result.consumedSkills.push({ playerId: defenderId, skillId: SKILL_ID.EMERGENCY_REPULSORS });
+    } else {
+      const armorDmgRef: ArmorDamageRef = { playerId: defenderId, slotIndex: victimSlot, newArmor };
+      result.armorDamage.push(armorDmgRef);
+      log.push(
+        `  diff ${diff} → ${victim.name} survives. Armor reduced to ${newArmor}.`,
+      );
+    }
   }
 
   // Marcar skills/effects consumidos
   if (aBon.attackerSkillUsed)
     result.consumedSkills.push({ playerId: attackerId, skillId: aBon.attackerSkillUsed });
-  if (dBon.defenderSkillUsed)
+  if (dBon.defenderSkillUsed && !dBon.immuneToDestroy)
     result.consumedSkills.push({ playerId: defenderId, skillId: dBon.defenderSkillUsed });
   if (aBon.trapChargeUsed)
     result.consumedPendingEffects.push({ playerId: attackerId, type: 'trap_charge' });
@@ -295,10 +311,6 @@ function resolveUnitAttack({
     victimSlot,
     victimDestroyed,
   );
-
-  // Si MINEFIELD activó y aún no marcamos al atacante destruido, hacerlo
-  // (checkDefenderTraps puede haber añadido un destroyed para el atacante).
-  void attackerDestroyed;
 
   return result;
 }
@@ -433,6 +445,34 @@ function findTauntInReach(
     if (card && card.id === SUPPORT_ID.HEPHAESTUS) return slot;
   }
   return null;
+}
+
+/**
+ * Calcula FP y AR efectivos de una unidad en el campo, incluyendo bonos de
+ * cartas Support adyacentes (HERMES +1 FP, ATHENA +2 AR).
+ * Usado por la UI para mostrar estadísticas modificadas en tiempo real.
+ * Devuelve null si el slot está vacío.
+ */
+export function getEffectiveStats(
+  player: PlayerState,
+  slotIndex: UnitSlotIndex,
+): { effectiveFp: number; effectiveAr: number } | null {
+  const card = player.units[slotIndex];
+  if (!card) return null;
+
+  let fpBonus = 0;
+  let arBonus = 0;
+
+  for (const adj of adjacentSlots(slotIndex)) {
+    const adjCard = player.units[adj];
+    if (adjCard?.id === SUPPORT_ID.HERMES) fpBonus += 1;
+    if (adjCard?.id === SUPPORT_ID.ATHENA) arBonus += 2;
+  }
+
+  return {
+    effectiveFp: card.firepower + fpBonus,
+    effectiveAr: card.armor + arBonus,
+  };
 }
 
 /**

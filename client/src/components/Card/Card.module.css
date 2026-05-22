@@ -33,6 +33,16 @@
   pointer-events: none;
 }
 
+/* ─── Estado exhausted (unidad que ya atacó este turno) ─────────────
+   Blanco y negro al ~55% de brillo. El slot padre ya no pasa onClick
+   (el bloqueo de selección ocurre a ese nivel), así que la carta
+   mantiene pointer-events para seguir disparando el hover preview. */
+.card.exhausted {
+  filter: saturate(0.3) brightness(0.8);
+  opacity: 0.8;
+  cursor: default;
+}
+
 /* Mismo tamaño que el slot — antes la mano usaba dimensiones distintas. */
 .card.inHand {
   width: var(--card-w);

@@ -372,9 +372,12 @@ export class Game {
 
     // Si el log devuelve solo una entrada de "⚠ Invalid" significa que la
     // validación interna rechazó el ataque. No consumimos un ataque.
+    // Con armor persistente, un ataque válido puede producir solo armorDamage
+    // (diff < 0) sin destroyed ni lifeDamage — por eso lo incluimos en la guardia.
     const isInvalid =
       result.destroyed.length === 0 &&
       result.lifeDamage === 0 &&
+      result.armorDamage.length === 0 &&
       result.log.length > 0 &&
       result.log[0]!.startsWith('⚠');
     if (isInvalid) {
@@ -395,6 +398,14 @@ export class Game {
         this.sendToBottom(d.playerId, card);
         this.players[d.playerId].units[d.slotIndex] = null;
       }
+    }
+
+    // Aplicar daño a armor (unidades que sobrevivieron con armor reducida).
+    // La armor del UnitCard se muta directamente — persiste hasta que la
+    // carta sea destruida o regrese al mazo.
+    for (const { playerId: pid, slotIndex, newArmor } of result.armorDamage) {
+      const unit = this.players[pid].units[slotIndex];
+      if (unit) unit.armor = newArmor;
     }
 
     const defenderId = otherPlayer(playerId);

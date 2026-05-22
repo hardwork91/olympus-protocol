@@ -217,25 +217,27 @@ describe('Resolución FP vs AR', () => {
     expect(r.lifeDamage).toBe(3);
   });
 
-  it('FP === AR: ambos destruidos, sin daño a vida', () => {
+  it('FP === AR: solo víctima destruida, sin daño a vida', () => {
     const game = makeGame(
       withUnits({ 2: unit('A', 'Tank', 5, 3) }),
       withUnits({ 2: unit('V', 'Tank', 3, 5) }),
     );
     const r = resolveAttack(game, 1, 2 as UnitSlotIndex, at(2));
-    expect(r.destroyed).toContainEqual({ playerId: 1, slotIndex: 2 });
+    expect(r.destroyed).not.toContainEqual({ playerId: 1, slotIndex: 2 });
     expect(r.destroyed).toContainEqual({ playerId: 2, slotIndex: 2 });
     expect(r.lifeDamage).toBe(0);
   });
 
-  it('FP < AR: solo atacante destruido', () => {
+  it('FP < AR: víctima sobrevive con armor reducida, atacante intacto', () => {
     const game = makeGame(
       withUnits({ 2: unit('A', 'Tank', 3, 3) }),
       withUnits({ 2: unit('V', 'Tank', 1, 6) }),
     );
     const r = resolveAttack(game, 1, 2 as UnitSlotIndex, at(2));
-    expect(r.destroyed).toContainEqual({ playerId: 1, slotIndex: 2 });
+    // FP 3 vs AR 6 → diff -3 → víctima sobrevive con AR 3
+    expect(r.destroyed).not.toContainEqual({ playerId: 1, slotIndex: 2 });
     expect(r.destroyed).not.toContainEqual({ playerId: 2, slotIndex: 2 });
+    expect(r.armorDamage).toContainEqual({ playerId: 2, slotIndex: 2, newArmor: 3 });
     expect(r.lifeDamage).toBe(0);
   });
 });
@@ -355,8 +357,8 @@ describe('Defensive skill: REINFORCEMENT (+2 AR)', () => {
       state: 'active',
     });
     const r = resolveAttack(makeGame(att, def), 1, 2 as UnitSlotIndex, at(2));
-    // FP 5 vs AR 3+2=5 → diff 0, ambos destruidos
-    expect(r.destroyed).toContainEqual({ playerId: 1, slotIndex: 2 });
+    // FP 5 vs AR 3+2=5 → diff 0, solo víctima destruida (atacante no muere)
+    expect(r.destroyed).not.toContainEqual({ playerId: 1, slotIndex: 2 });
     expect(r.destroyed).toContainEqual({ playerId: 2, slotIndex: 2 });
     expect(r.lifeDamage).toBe(0);
     expect(r.consumedSkills).toContainEqual({
@@ -458,8 +460,10 @@ describe('Trap: MINEFIELD (attacker also destroyed)', () => {
       state: 'hidden',
     });
     const r = resolveAttack(makeGame(att, def), 1, 2 as UnitSlotIndex, at(2));
-    // Atacante destruido por AR>FP, pero NO por MINEFIELD
-    expect(r.destroyed).toContainEqual({ playerId: 1, slotIndex: 2 });
+    // FP 2 vs AR 8 → diff -6 → víctima sobrevive con AR 6, ninguno destruido
+    expect(r.destroyed).not.toContainEqual({ playerId: 1, slotIndex: 2 });
+    expect(r.destroyed).not.toContainEqual({ playerId: 2, slotIndex: 2 });
+    expect(r.armorDamage).toContainEqual({ playerId: 2, slotIndex: 2, newArmor: 6 });
     expect(r.consumedSkills).not.toContainEqual({
       playerId: 2,
       skillId: SKILL_ID.MINEFIELD,
@@ -542,9 +546,10 @@ describe('Support: HERMES (+1 FP adyacente)', () => {
     });
     const def = withUnits({ 2: unit('V', 'Tank', 1, 5) });
     const r = resolveAttack(makeGame(att, def), 1, 2 as UnitSlotIndex, at(2));
-    // FP 3 + 1 = 4 vs AR 5 → diff -1, atacante destruido (sin Hermes diff -2)
-    // ya, igual atacante destruido. Validemos lifeDamage = 0 y atacante destruido.
-    expect(r.destroyed).toContainEqual({ playerId: 1, slotIndex: 2 });
+    // FP 3 + 1 = 4 vs AR 5 → diff -1 → víctima sobrevive con AR 1 (sin Hermes sería AR 2)
+    expect(r.destroyed).not.toContainEqual({ playerId: 1, slotIndex: 2 });
+    expect(r.destroyed).not.toContainEqual({ playerId: 2, slotIndex: 2 });
+    expect(r.armorDamage).toContainEqual({ playerId: 2, slotIndex: 2, newArmor: 1 });
   });
 
   it('Hermes en posición no adyacente NO aporta', () => {
@@ -554,8 +559,8 @@ describe('Support: HERMES (+1 FP adyacente)', () => {
     });
     const def = withUnits({ 4: unit('V', 'Tank', 1, 5) });
     const r = resolveAttack(makeGame(att, def), 1, 4 as UnitSlotIndex, at(4));
-    // FP 5 vs AR 5 → diff 0, ambos destruidos
-    expect(r.destroyed).toContainEqual({ playerId: 1, slotIndex: 4 });
+    // FP 5 vs AR 5 → diff 0 → solo víctima destruida (atacante no muere)
+    expect(r.destroyed).not.toContainEqual({ playerId: 1, slotIndex: 4 });
     expect(r.destroyed).toContainEqual({ playerId: 2, slotIndex: 4 });
   });
 });
@@ -568,8 +573,8 @@ describe('Support: ATHENA (+2 AR adyacente)', () => {
       2: unit('V', 'Tank', 1, 3),
     });
     const r = resolveAttack(makeGame(att, def), 1, 2 as UnitSlotIndex, at(2));
-    // FP 5 vs AR 3+2 = 5 → diff 0, ambos destruidos
-    expect(r.destroyed).toContainEqual({ playerId: 1, slotIndex: 2 });
+    // FP 5 vs AR 3+2 = 5 → diff 0 → solo víctima destruida (atacante no muere)
+    expect(r.destroyed).not.toContainEqual({ playerId: 1, slotIndex: 2 });
     expect(r.destroyed).toContainEqual({ playerId: 2, slotIndex: 2 });
     expect(r.lifeDamage).toBe(0);
   });
@@ -595,8 +600,10 @@ describe('Support: HEPHAESTUS taunt', () => {
       2: unit('V', 'Tank', 1, 3),
     });
     const r = resolveAttack(makeGame(att, def), 1, 2 as UnitSlotIndex, at(1));
-    // FP 5 vs AR 6 → atacante destruido
-    expect(r.destroyed).toContainEqual({ playerId: 1, slotIndex: 2 });
+    // FP 5 vs AR 6 → diff -1 → HEPHAESTUS sobrevive con AR 1, atacante intacto
+    expect(r.destroyed).not.toContainEqual({ playerId: 1, slotIndex: 2 });
+    expect(r.destroyed).not.toContainEqual({ playerId: 2, slotIndex: 1 });
+    expect(r.armorDamage).toContainEqual({ playerId: 2, slotIndex: 1, newArmor: 1 });
   });
 
   it('getForcedTauntTarget devuelve el slot de HEPHAESTUS', () => {

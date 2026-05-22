@@ -35,6 +35,12 @@ interface CardProps {
   style?: React.CSSProperties;
   /** Modo ataque activo y esta carta no es relevante — oscurece y desactiva. */
   dimmed?: boolean;
+  /** Esta unidad ya atacó este turno — blanco y negro, sin hover-lift, sin click. */
+  exhausted?: boolean;
+  /** FP efectivo (con bonos de Support). Si difiere del base, se colorea en verde. */
+  effectiveFp?: number;
+  /** AR efectiva (con bonos de Support). Si difiere de la base, se colorea en verde. */
+  effectiveAr?: number;
 }
 
 export default function Card({
@@ -50,6 +56,9 @@ export default function Card({
   enterDelay = 0,
   style,
   dimmed,
+  exhausted,
+  effectiveFp,
+  effectiveAr,
 }: CardProps) {
   // Tracking del mouse para el efecto "spotlight" (luz orbital amarilla).
   // Actualizamos las CSS vars --mouse-x/--mouse-y directamente sobre el DOM
@@ -109,6 +118,7 @@ export default function Card({
     skillState === 'consumed' && styles.skillConsumed,
     !onClick && styles.notClickable,
     dimmed && styles.dimmed,
+    exhausted && styles.exhausted,
   );
 
   if (faceDown || !card) {
@@ -154,8 +164,8 @@ export default function Card({
       initial={cardMotion.initial}
       animate={cardMotion.animate}
       exit={cardMotion.exit}
-      whileHover={onClick ? { y: -6 } : undefined}
-      whileTap={onClick ? { scale: 0.96 } : undefined}
+      whileHover={onClick && !exhausted ? { y: -6 } : undefined}
+      whileTap={onClick && !exhausted ? { scale: 0.96 } : undefined}
     >
       {/* Capa 1: imagen de la unidad/skill */}
       {card.image && (
@@ -167,8 +177,29 @@ export default function Card({
       <div className={styles.frameName}>{card.name}</div>
       {isUnit ? (
         <>
-          <div className={styles.frameFp}>{card.firepower}</div>
-          <div className={styles.frameAr}>{card.armor}</div>
+          {/* Las cartas Support no tienen ataque — nunca se muestra FP */}
+          {card.subtype !== 'Support' && (
+            <div
+              className={styles.frameFp}
+              style={
+                effectiveFp !== undefined && effectiveFp !== card.firepower
+                  ? { color: effectiveFp > card.firepower ? '#4ade80' : '#f87171' }
+                  : undefined
+              }
+            >
+              {effectiveFp !== undefined ? effectiveFp : card.firepower}
+            </div>
+          )}
+          <div
+            className={styles.frameAr}
+            style={
+              effectiveAr !== undefined && effectiveAr !== card.armor
+                ? { color: effectiveAr > card.armor ? '#4ade80' : '#f87171' }
+                : undefined
+            }
+          >
+            {effectiveAr !== undefined ? effectiveAr : card.armor}
+          </div>
           {card.lore && <div className={styles.frameDesc}>{card.lore}</div>}
         </>
       ) : (

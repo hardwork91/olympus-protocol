@@ -82,7 +82,6 @@
   grid-template-rows: 1fr 1fr;
   gap: 0;
   min-height: 0;
-  overflow: hidden;
 }
 
 /* Botón "Attack Life" — overlay flotante centrado entre rival y player. */
@@ -143,6 +142,26 @@
 .flyLeft {
   left: -13px;
   transform: translateY(-50%) scaleX(-1);
+}
+
+/* Ícono de ataque — separador decorativo centrado entre los dos campos */
+.attackIcon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 2;
+  width: 13%;
+  height: 13%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.attackIcon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 /* Decorativo que se superpone sobre el sidebar DERECHO */

@@ -193,10 +193,18 @@ export interface ConsumedPendingEffectRef {
   type: string;
 }
 
+/** Daño a armor que NO destruye la unidad — la armor persiste al siguiente turno. */
+export interface ArmorDamageRef {
+  playerId: PlayerId;
+  slotIndex: UnitSlotIndex;
+  /** Nueva armor tras el ataque (> 0, la unidad sobrevive). */
+  newArmor: number;
+}
+
 /** Resultado de un solo ataque (1 atacante → 1 target). */
 export interface AttackResult {
   log: string[];
-  /** Slots destruidos por este ataque (atacante o defensor). */
+  /** Slots destruidos por este ataque. */
   destroyed: DestroyedRef[];
   /** Daño a vida del defensor (no muta state, lo aplica el motor). */
   lifeDamage: number;
@@ -206,6 +214,8 @@ export interface AttackResult {
   newPendingEffects: NewPendingEffectRef[];
   /** Pending effects que se consumieron al aplicarse. */
   consumedPendingEffects: ConsumedPendingEffectRef[];
+  /** Unidades que sobrevivieron con armor reducida (persiste al próximo turno). */
+  armorDamage: ArmorDamageRef[];
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────

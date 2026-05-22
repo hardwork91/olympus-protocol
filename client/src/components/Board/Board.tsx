@@ -11,15 +11,19 @@ import Hand from '@components/Hand/Hand';
 import InfoSidebar from '@components/InfoSidebar/InfoSidebar';
 import PlayerArea from '@components/PlayerArea/PlayerArea';
 import Sidebar from '@components/Sidebar/Sidebar';
+import TurnBanner from '@components/TurnBanner/TurnBanner';
 import { useSound } from '@hooks/useSound';
 import { getForcedTauntTarget } from '@server/combat';
 import { Game } from '@server/gameEngine';
 import * as gameService from '@services/gameService';
 import type { PlayerId, SerializedGameState, UnitSlotIndex } from '@shared/types';
-import { getAttackType, getReachableSlots, otherPlayer } from '@shared/types';
+import { UNIT_SLOTS, getAttackType, getReachableSlots, otherPlayer } from '@shared/types';
 import { useUIStore } from '@store/uiStore';
 import { asset } from '@utils/asset';
+import { computeAttackAnimations } from '@utils/attackAnimations';
 import clsx from 'clsx';
+import { AnimatePresence } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
 import styles from './Board.module.css';
 
 interface BoardProps {
@@ -37,6 +41,73 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
 
   const opponentSeat: PlayerId = otherPlayer(localSeat);
   const game = Game.fromSerialized(state);
+
+  // ─── Estado de animaciones de daño ───────────────────────────────────
+  type SlotAnimMap = Partial<Record<UnitSlotIndex, { id: number; amount: number }>>;
+  const nextAnimId = useRef(0);
+  const [opponentSlotAnims, setOpponentSlotAnims] = useState<SlotAnimMap>({});
+  const [opponentLifeAnim, setOpponentLifeAnim] = useState<{ id: number; amount: number } | null>(null);
+
+  // ─── Banner de turno ─────────────────────────────────────────────────
+  const [turnBanner, setTurnBanner] = useState<{ id: number; playerId: PlayerId } | null>(null);
+  const prevActivePlayer = useRef<PlayerId | null>(null);
+  const turnBannerId = useRef(0);
+
+  useEffect(() => {
+    if (state.phase !== 'playing') return;
+    const current = state.activePlayer;
+    if (current === prevActivePlayer.current) return;
+    prevActivePlayer.current = current;
+    const id = turnBannerId.current++;
+    setTurnBanner({ id, playerId: current });
+    const timer = setTimeout(() => {
+      setTurnBanner((prev) => (prev?.id === id ? null : prev));
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [state.activePlayer, state.phase]);
+
+  /** Calcula y dispara las animaciones de daño de un ataque. Se llama ANTES del
+   *  round-trip a Firebase para que la animación sea inmediata al click. */
+  const fireAttackAnims = (
+    attackerSlot: UnitSlotIndex,
+    target: Parameters<typeof computeAttackAnimations>[3],
+  ): void => {
+    const anim = computeAttackAnimations(state, localSeat, attackerSlot, target);
+    const id = nextAnimId.current++;
+    const ANIM_DURATION = 1450;
+
+    if (anim.slotDamage) {
+      const { slotIndex, amount } = anim.slotDamage;
+      setOpponentSlotAnims((prev) => ({ ...prev, [slotIndex]: { id, amount } }));
+      setTimeout(() => {
+        setOpponentSlotAnims((prev) => {
+          const next = { ...prev };
+          if (next[slotIndex]?.id === id) delete next[slotIndex];
+          return next;
+        });
+      }, ANIM_DURATION);
+    }
+
+    if (anim.lifeDamage > 0) {
+      setOpponentLifeAnim({ id, amount: anim.lifeDamage });
+      setTimeout(() => {
+        setOpponentLifeAnim((prev) => (prev?.id === id ? null : prev));
+      }, ANIM_DURATION);
+    }
+  };
+
+  // ─── Slots agotados: unidades que ya atacaron este turno ─────────────
+
+  const exhaustedSlots = new Set<UnitSlotIndex>();
+  if (state.phase === 'playing' && state.activePlayer === localSeat && state.turnState) {
+    const attackedIds = new Set(state.turnState.cardsAttackedThisTurn);
+    for (let i = 0; i < UNIT_SLOTS; i++) {
+      const unit = state.players[localSeat].units[i as UnitSlotIndex];
+      if (unit && attackedIds.has(unit.instanceId)) {
+        exhaustedSlots.add(i as UnitSlotIndex);
+      }
+    }
+  }
 
   // ─── Computar slots válidos según la selección actual ────────────────
 
@@ -132,6 +203,8 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
     if (!validAttackTargets.has(index)) return;
     const attackerSlot = selection.slotIndex;
     clearSelection();
+    // Disparar animación de inmediato (antes del round-trip a Firebase)
+    fireAttackAnims(attackerSlot, { kind: 'unit', index });
     gameService
       .declareAttack(roomId, localSeat, attackerSlot, { kind: 'unit', index })
       .then(() => playSound('cardPlace'))
@@ -161,6 +234,8 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
     if (!canAttackLifeWithCurrent) return;
     const attackerSlot = selection.slotIndex;
     clearSelection();
+    // Disparar animación de inmediato
+    fireAttackAnims(attackerSlot, { kind: 'life' });
     gameService
       .declareAttack(roomId, localSeat, attackerSlot, { kind: 'life' })
       .then(() => playSound('damageTaken'))
@@ -204,6 +279,8 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
               selection?.kind === 'attacker' ? handleOpponentUnitSlotClick : undefined
             }
             attackModeActive={attackModeActive}
+            slotAnims={opponentSlotAnims}
+            lifeDamageAnim={opponentLifeAnim}
           />
 
           <PlayerArea
@@ -221,6 +298,7 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
             onUnitSlotClick={handleLocalUnitSlotClick}
             onSkillSlotClick={handleSkillSlotClick}
             attackModeActive={attackModeActive}
+            exhaustedSlots={exhaustedSlots}
           />
 
           {/* Botón "Attack Life" como overlay centrado entre las dos filas */}
@@ -229,6 +307,26 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
               ⚔ Attack life of Player {opponentSeat}
             </button>
           )}
+
+          {/* Ícono de ataque — separador decorativo centrado entre los dos campos */}
+          <div className={styles.attackIcon} aria-hidden="true">
+            <img src={asset('/images/attack-icon.png')} alt="" />
+          </div>
+
+          {/* Decoraciones flotantes — dentro del terreno, centradas verticalmente */}
+          <div className={clsx(styles.fly, styles.flyRight)} aria-hidden="true">
+            <img src={asset('/images/fly.png')} alt="" />
+          </div>
+          <div className={clsx(styles.fly, styles.flyLeft)} aria-hidden="true">
+            <img src={asset('/images/fly.png')} alt="" />
+          </div>
+
+          {/* Banner de turno — aparece al centro cuando cambia el jugador activo */}
+          <AnimatePresence>
+            {turnBanner && (
+              <TurnBanner key={turnBanner.id} playerId={turnBanner.playerId} />
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Fila inferior: mano local (1/3 del alto) */}
@@ -243,14 +341,6 @@ export default function Board({ roomId, state, localSeat }: BoardProps) {
             onCardClick={handleHandCardClick}
             attackModeActive={attackModeActive}
           />
-        </div>
-
-        {/* Decoraciones flotantes */}
-        <div className={clsx(styles.fly, styles.flyRight)} aria-hidden="true">
-          <img src={asset('/images/fly.png')} alt="" />
-        </div>
-        <div className={clsx(styles.fly, styles.flyLeft)} aria-hidden="true">
-          <img src={asset('/images/fly.png')} alt="" />
         </div>
       </main>
 

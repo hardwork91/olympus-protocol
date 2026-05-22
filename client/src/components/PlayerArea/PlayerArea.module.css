@@ -11,12 +11,21 @@
 }
 
 .active {
-  outline: 1px solid rgba(251, 191, 36, 0.5);
-  outline-offset: -2px;
+  /* outline eliminado — el turno activo ya se indica en el sidebar */
 }
 
 .unitsRow {
   display: flex;
   gap: 24px;
   flex-shrink: 0;
+  position: relative;
+}
+
+/* Punto de anclaje para el float de daño a vida (centrado sobre el unitsRow) */
+.lifeDamageAnchor {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  pointer-events: none;
+  z-index: 25;
 }

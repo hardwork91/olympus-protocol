@@ -10,7 +10,8 @@
 // ============================================================================
 
 import Card from '@components/Card/Card';
-import type { PlayerId, PlayerState, SerializedGameState } from '@shared/types';
+import { UNITS } from '@shared/cards';
+import type { Card as CardType, PlayerId, PlayerState, SerializedGameState } from '@shared/types';
 import { otherPlayer } from '@shared/types';
 import { useUIStore } from '@store/uiStore';
 import clsx from 'clsx';
@@ -67,6 +68,16 @@ export default function InfoSidebar({ state, localSeat }: InfoSidebarProps) {
   const hoveredCard = useUIStore((s) => s.hoveredCard);
   const opponentSeat = otherPlayer(localSeat);
 
+  // Mostrar siempre las estadísticas originales de la carta (sin bonos de campo
+  // ni daño a armadura acumulado). Buscamos la definición original por id en UNITS.
+  const displayCard: CardType | undefined = (() => {
+    if (!hoveredCard) return undefined;
+    if (hoveredCard.type !== 'unit') return hoveredCard;
+    const template = UNITS.find((u) => u.id === hoveredCard.id);
+    if (!template) return hoveredCard;
+    return { ...hoveredCard, armor: template.armor, firepower: template.firepower };
+  })();
+
   const isActive = (id: PlayerId): boolean =>
     state.phase === 'setup'
       ? state.setupState?.currentPlayer === id
@@ -78,8 +89,8 @@ export default function InfoSidebar({ state, localSeat }: InfoSidebarProps) {
       <div className={styles.previewSection}>
         <div className={styles.previewLabel}>CARD DETAIL</div>
         <div className={styles.previewWrapper}>
-          {hoveredCard ? (
-            <Card card={hoveredCard} variant="inSlot" />
+          {displayCard ? (
+            <Card card={displayCard} variant="inSlot" />
           ) : (
             <div className={styles.previewEmpty}>
               <span className={styles.previewHint}>hover a card</span>
